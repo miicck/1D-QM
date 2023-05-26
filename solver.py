@@ -66,14 +66,41 @@ def density_from_orbitals(orbs: np.ndarray, n_elec: float):
     -------
     density: np.ndarray
     """
-    n_orb = math.ceil(n_elec)
-    n_homo = n_elec - math.floor(n_elec)
+    i = 0
+    result = np.zeros(orbs[:, 0].shape)
+    while n_elec > 0:
+        if n_elec < 1:
+            result += n_elec * orbs[:, i] ** 2
+            break
 
-    if abs(n_homo) < 1e-6:
-        assert abs(n_orb - n_elec) < 1e-6
-        return sum(orbs[:, i] ** 2 for i in range(n_orb))
+        result += orbs[:, i] ** 2
+        n_elec -= 1.0
+        i += 1
 
-    return sum(orbs[:, i] ** 2 for i in range(n_orb - 1)) + orbs[:, n_orb - 1] ** 2 * n_homo
+    return result
+
+
+def laplacian(x: np.ndarray, orbital: np.ndarray) -> np.ndarray:
+    """
+    Returns the laplacian of the given orbital d^2\phi/dx^2.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        coordinates
+    orbital: np.ndarray
+        orbital \phi
+
+    Returns
+    -------
+    lap: np.ndarray
+        Laplacian of the given orbital
+    """
+    lap = np.zeros(orbital.shape)
+    for i in range(2, len(orbital)):
+        lap[i - 1] = orbital[i - 2] - 2 * orbital[i - 1] + orbital[i]
+    lap /= 2 * ((x[1] - x[0]) ** 2)
+    return lap
 
 
 def orbitals_from_density(x: np.ndarray, rho: np.ndarray, plot: bool = False, n_elec_tol=0.1):
@@ -106,7 +133,8 @@ def orbitals_from_density(x: np.ndarray, rho: np.ndarray, plot: bool = False, n_
         plt.ion()
 
     n_elec = np.trapz(rho, x)
-    v = np.zeros(x.shape)
+    v = np.zeros(rho.shape)
+    kinetic_energies = []
 
     while True:
         evals, phi = schrodinger_1d(x, v)
@@ -117,18 +145,36 @@ def orbitals_from_density(x: np.ndarray, rho: np.ndarray, plot: bool = False, n_
         if np.trapz(abs(d_rho), x) < n_elec_tol:
             if plot:
                 plt.ioff()
+                plt.clf()
             return evals, phi, v
 
         if plot:
             plt.clf()
 
             plt.subplot(221)
-            plt.plot(x, rho)
-            plt.plot(x, rho_phi)
-            plt.plot(x, v / max(abs(v)))
+            plt.plot(x, rho, label="rho")
+            plt.plot(x, rho_phi, label="rho_phi")
+            plt.plot(x, v / max(abs(v)), label="v")
+            plt.legend()
+
+            ke = 0.0
 
             plt.subplot(222)
             for i in range(math.ceil(n_elec)):
                 plt.plot(x, phi[:, i] + i)
+                plt.axhline(i, color="black", alpha=0.5)
+                ke += -0.5 * np.trapz(laplacian(x, phi[:, i]), x)
+
+            kinetic_energies.append(ke)
+
+            plt.subplot(223)
+            plt.plot(kinetic_energies)
+            plt.ylabel("Kinetic energy")
+            plt.xlabel("Iteration")
+
+            plt.subplot(224)
+            plt.plot(v / rho_phi)
+            plt.ylabel("v/rho_phi")
+            plt.yscale("symlog")
 
             plt.pause(0.01)
