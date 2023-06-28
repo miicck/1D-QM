@@ -6,7 +6,10 @@ from typing import List, Tuple, Callable, Iterable
 
 
 class Orbital(Function):
-    pass
+
+    @property
+    def kinetic_energy(self) -> float:
+        return -0.5 * self.inner_product(self.laplacian)
 
 
 class OrbitalSpectrum:
@@ -137,31 +140,3 @@ class Density(Function):
         plt.tight_layout()
 
         plt.pause(0.001)
-
-    def plot_with_potential_and_orbitals(self):
-        import matplotlib.pyplot as plt
-        pot = self.calculate_potential()
-        orbs = pot.calculate_eigenstates()
-
-        plt.subplot(221)
-        plt.plot(self.x.values, self.values, label="Input density")
-        plt.plot(self.x.values, orbs.density(self.particles), linestyle=":", label="Density from orbitals")
-        plt.xlabel(r"$x$")
-        plt.ylabel(r"$\rho$")
-        plt.legend()
-
-        plt.subplot(222)
-        for i in range(round(self.particles)):
-            orb = orbs.orbitals[i].values
-            orb /= max(orb) - min(orb)
-            plt.plot(self.x.values, orb + i)
-            plt.axhline(i, color="black", alpha=0.2)
-        plt.xlabel(r"$x$")
-        plt.ylabel(r"$\phi_i$")
-
-        plt.subplot(223)
-        plt.plot(self.x.values, pot.values)
-        plt.xlabel(r"$x$")
-        plt.ylabel(r"$v$")
-
-        plt.show()

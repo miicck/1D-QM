@@ -51,9 +51,14 @@ class Grid:
 
 class Function:
 
-    def __init__(self, grid: Grid):
+    def __init__(self, grid: Grid, values: np.ndarray = None):
         self._grid = grid
-        self._values = np.zeros(grid.values.shape)
+        if values is not None:
+            values = np.array(values)
+            assert values.shape == grid.values.shape
+            self._values = values
+        else:
+            self._values = np.zeros(grid.values.shape)
 
     @property
     def x(self) -> Grid:
@@ -78,6 +83,13 @@ class Function:
         lapf = Function(self.x)
         lapf.values = self.x.laplacian @ self.values
         return lapf
+
+    @property
+    def norm(self) -> float:
+        return self.inner_product(self) ** 0.5
+
+    def normalize(self) -> None:
+        self.values /= self.norm
 
     def inner_product(self, other: 'Function') -> float:
         assert np.allclose(self.x.values, other.x.values)

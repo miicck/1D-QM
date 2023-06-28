@@ -14,8 +14,15 @@ def test_grid_laplacian():
 
 def test_function_creation():
     function = Function(Grid(-10, 10, 100))
-    function.values += np.sin(function.x.values)
+    function.values = np.sin(function.x.values)
     assert np.allclose(function.values, np.sin(np.linspace(-10, 10, 100)))
+
+
+def test_function_norm():
+    function = Function(Grid(-10, 10, 100))
+    function.values = np.sin(function.x.values)
+    function.normalize()
+    assert np.allclose(function.norm, 1.0)
 
 
 def test_function_laplacian():
