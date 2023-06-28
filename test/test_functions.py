@@ -43,3 +43,20 @@ def test_density_potential():
     d.values = np.exp(-(d.x.values - 1) ** 2) + np.exp(-(d.x.values + 1) ** 2)
     d.particles = 3
     v = d.calculate_potential(n_elec_tol=0.1)  # , callback=d.calculate_potential_animation_callback)
+
+
+def test_density_from_orbitals():
+    d = Density(Grid(-10, 10, 100))
+    d.values = np.exp(-(d.x.values - 1) ** 2) + np.exp(-(d.x.values + 1) ** 2)
+    d.particles = 3
+    v = d.calculate_potential(n_elec_tol=0.1)
+    e = v.calculate_eigenstates()
+    delta_d = Density(d.x, abs(e.density(3).values - d.values))
+    assert delta_d.particles < 0.1
+
+
+def test_aufbau():
+    assert np.allclose(OrbitalSpectrum.aufbau_weights(1.5), [1, 0.5])
+    assert np.allclose(OrbitalSpectrum.aufbau_weights(1.0), [1])
+    assert np.allclose(OrbitalSpectrum.aufbau_weights(1.00001), [1, 0.00001])
+    assert np.allclose(OrbitalSpectrum.aufbau_weights(2.5), [1, 1, 0.5])

@@ -26,6 +26,10 @@ class OrbitalSpectrum:
     def orbitals(self) -> List[Orbital]:
         return self._orbitals
 
+    def kinetic_energy(self, particles: float) -> float:
+        auf = OrbitalSpectrum.aufbau_weights(particles)
+        return sum(a * self.orbitals[i].kinetic_energy for i, a in enumerate(auf))
+
     def density(self, particles: float) -> 'Density':
         """
         Evaluate the density that results from filling these
@@ -41,11 +45,16 @@ class OrbitalSpectrum:
         density: Density
             Resulting particle density
         """
-        result = Density(self.orbitals[0].x)
-        full = math.floor(particles)
-        result.values = sum(self.orbitals[i].values ** 2 for i in range(full))
-        result.values += (particles - full) * self.orbitals[full].values ** 2
-        return result
+        auf = OrbitalSpectrum.aufbau_weights(particles)
+        return Density(self.orbitals[0].x,
+                       sum(a * self.orbitals[i].values ** 2 for i, a in enumerate(auf)))
+
+    @staticmethod
+    def aufbau_weights(particles: float) -> np.ndarray:
+        n_filled = math.floor(particles)
+        result = [1.0] * n_filled + [particles - n_filled]
+        result = [r for r in result if r > 1e-10]
+        return np.array(result)
 
 
 class Potential(Function):
@@ -86,13 +95,14 @@ class Density(Function):
         assert_all_close(self.particles, val)
 
     def calculate_potential(self, n_elec_tol: float = 0.01,
-                            callback: Callable[
-                                [Potential, OrbitalSpectrum, 'Density', 'Density'], None] = None) -> 'Potential':
+                            callback: Callable[[Potential, OrbitalSpectrum, 'Density', 'Density'], None] = None,
+                            max_iter=10000
+                            ) -> 'Potential':
 
         v = Potential(self.x)
         v.values = -self.values.copy()
 
-        while True:
+        for iteration in range(max_iter):
 
             # Diagonalize the potential
             eig = v.calculate_eigenstates()
@@ -106,11 +116,13 @@ class Density(Function):
             if np.trapz(abs(delta_density), self.x.values) < n_elec_tol:
                 return v
 
-            v.values += delta_density
+            v.values += delta_density * 0.5
             v.values -= min(v.values)
 
             if callback is not None:
                 callback(v, eig, self, eig_d)
+
+        return v
 
     @staticmethod
     def calculate_potential_animation_callback(v: Potential, eig: OrbitalSpectrum, targ_d: 'Density', eig_d: 'Density'):

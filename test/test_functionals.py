@@ -10,13 +10,13 @@ def test_guassian_repulsion():
 
 
 def test_minimize(plot=False):
-    grid = Grid(-10, 10, 31)
+    grid = Grid(-10, 10, 22)
 
-    v = Potential(grid, (grid.values - 1) ** 2 / 10)
+    v = Potential(grid, grid.values ** 2 / 10)
 
     dens = minimize_density_functional(
         4, grid,
-        [ExternalPotential(v), VonWeizakerKE()],
+        [ExternalPotential(v), ExactKineticEnergyFunctional()],
         plot=plot
     )
 

@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from functions import *
 from typing import Iterable
@@ -39,8 +41,18 @@ class ExternalPotential(EnergyDensityFunctional):
     def apply(self, density: Density) -> float:
         return density.inner_product(self.v_ext)
 
-    def __call__(self, *args, **kwargs):
-        return self.apply(*args, **kwargs)
+
+class ExactKineticEnergyFunctional(EnergyDensityFunctional):
+
+    def __init__(self, n_elec_tol=0.1, max_iter=10):
+        self._n_elec_tol = n_elec_tol
+        self._max_iter = max_iter
+
+    def apply(self, density: Density) -> float:
+        v = density.calculate_potential(n_elec_tol=self._n_elec_tol,
+                                        max_iter=self._max_iter)
+        e = v.calculate_eigenstates()
+        return e.kinetic_energy(density.particles)
 
 
 class GuassianRepulsion(PotentialDensityFunctional):
@@ -75,6 +87,23 @@ class VonWeizakerKE(EnergyDensityFunctional):
         return -0.5 * sqrt.inner_product(sqrt.laplacian)
 
 
+def _minimize_density_functional_density(x: np.ndarray, particles: float, grid: Grid) -> Density:
+    d = Density(grid, x ** 2)
+    d.particles = particles
+    return d
+
+
+def _minimize_density_functional_cost(
+        x: np.ndarray,
+        particles: float,
+        grid: Grid,
+        energy_functionals: Iterable[EnergyDensityFunctional] = None,
+        potential_functionals: Iterable[PotentialDensityFunctional] = None) -> float:
+    d = _minimize_density_functional_density(x, particles, grid)
+    return sum(f(d) for f in energy_functionals) + \
+        sum(ExternalPotential(p(d))(d) for p in potential_functionals)
+
+
 def minimize_density_functional(
         particles: float,
         grid: Grid,
@@ -86,24 +115,27 @@ def minimize_density_functional(
     energy_functionals = energy_functionals or []
     potential_functionals = potential_functionals or []
 
-    def energy(d: Density):
-        return \
-                sum(f(d) for f in energy_functionals) + \
-                sum(ExternalPotential(p(d))(d) for p in potential_functionals)
-
-    def x_to_denisty(x: np.ndarray):
-        d = Density(grid, x ** 2)
-        d.particles = particles
-        return d
-
     def scipy_cost(x: np.ndarray):
-        e = energy(x_to_denisty(x))
-        return e
+        return _minimize_density_functional_cost(x, particles, grid, energy_functionals, potential_functionals)
+
+    def scipy_gadient(x: np.ndarray) -> np.ndarray:
+        from multiprocessing import Pool, cpu_count
+
+        dn = np.identity(len(x)) * 1e-6
+        f0 = _minimize_density_functional_cost(x, particles, grid, energy_functionals, potential_functionals)
+
+        with Pool(cpu_count()) as p:
+            fnew = p.starmap(_minimize_density_functional_cost,
+                             [[x + dn[i], particles, grid, energy_functionals, potential_functionals] for i in
+                              range(len(x))])
+
+        g = (np.array(fnew) - f0) / dn[0, 0]
+        return g
 
     history = []
 
     def callback(x):
-        d = x_to_denisty(x)
+        d = _minimize_density_functional_density(x, particles, grid)
 
         if not plot:
             return
@@ -131,5 +163,9 @@ def minimize_density_functional(
         plt.plot(history)
         plt.pause(0.01)
 
-    res = minimize(scipy_cost, np.ones(len(grid.values)), callback=callback)
-    return x_to_denisty(res.x)
+    width = (max(grid.values) - min(grid.values)) / 4.0
+    guess = np.exp(-(grid.values / width) ** 2)
+
+    res = minimize(scipy_cost, guess, callback=callback, jac=scipy_gadient)
+
+    return _minimize_density_functional_density(res.x, particles, grid)
