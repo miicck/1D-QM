@@ -55,6 +55,21 @@ class ExactKineticEnergyFunctional(EnergyDensityFunctional):
         return e.kinetic_energy(density.particles)
 
 
+class BasicLadderKineticEnergyFunctional(EnergyDensityFunctional):
+
+    def apply(self, density: Density) -> float:
+        from ladder import NormalizeToGroundState, DerivativeLadderOperator
+        gs_map = NormalizeToGroundState()
+        ladder = DerivativeLadderOperator()
+
+        generated = [gs_map.apply(density)]
+        while len(generated) < density.particles:
+            generated.append(ladder.apply(generated[-1]))
+
+        auf = OrbitalSpectrum.aufbau_weights(density.particles)
+        return sum(a * generated[i].kinetic_energy for i, a in enumerate(auf))
+
+
 class GuassianRepulsion(PotentialDensityFunctional):
 
     def apply(self, density: Density) -> Potential:
@@ -168,4 +183,4 @@ def minimize_density_functional(
 
     res = minimize(scipy_cost, guess, callback=callback, jac=scipy_gadient)
 
-    return _minimize_density_functional_density(res.x, particles, grid)
+    return _minimize_density_functional_density(res.x, particles, grid), res.fun

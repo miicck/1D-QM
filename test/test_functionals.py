@@ -16,7 +16,7 @@ def test_minimize(plot=False):
 
     dens = minimize_density_functional(
         4, grid,
-        [ExternalPotential(v), ExactKineticEnergyFunctional()],
+        [ExternalPotential(v), VonWeizakerKE()],
         plot=plot
     )
 

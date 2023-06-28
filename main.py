@@ -17,18 +17,29 @@ def ladder_plot():
     plot_ladder_result(rho)
 
 
-def vw_vs_exact_ke_plot():
+def vw_vs_exact_ke_plot(exact_ke_func=False, n_elec=2, show_plot=True):
     # Create an harmonic potential
     grid = Grid(-10, 10, 51)
     v = Potential(grid, grid.values ** 2 / 10)
 
-    dvw = minimize_density_functional(2, grid, [ExternalPotential(v), VonWeizakerKE()])
-    dex = minimize_density_functional(2, grid, [ExternalPotential(v), ExactKineticEnergyFunctional(max_iter=10)])
+    if exact_ke_func:
+        dex = minimize_density_functional(
+            n_elec, grid, [ExternalPotential(v), ExactKineticEnergyFunctional(max_iter=100)])
+    else:
+        eigs = v.calculate_eigenstates()
+        d = eigs.density(n_elec)
+        dex = [d, ExternalPotential(v)(d) + eigs.kinetic_energy(n_elec)]
+    dvw = minimize_density_functional(n_elec, grid, [ExternalPotential(v), VonWeizakerKE()])
+    dbl = minimize_density_functional(n_elec, grid, [ExternalPotential(v), BasicLadderKineticEnergyFunctional()])
 
-    plt.plot(v.x.values, dvw.values, label="vW density")
-    plt.plot(v.x.values, dex.values, label="exact density")
+    plt.plot(v.x.values, dvw[0].values, label=f"vW density, E = {dvw[1]:<12.6f}")
+    plt.plot(v.x.values, dex[0].values, label=f"exact density, E = {dex[1]:<12.6f}")
+    plt.plot(v.x.values, dbl[0].values, label=f"ladder density, E = {dbl[1]:<12.6f}")
+    plt.annotate(f"N = {n_elec}", (0, 0))
     plt.legend()
-    plt.show()
+
+    if show_plot:
+        plt.show()
 
 
 if __name__ == "__main__":
