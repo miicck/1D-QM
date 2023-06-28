@@ -9,7 +9,7 @@ def test_guassian_repulsion():
     v = GuassianRepulsion()(density)
 
 
-def test_minimize():
+def test_minimize(plot=False):
     grid = Grid(-10, 10, 31)
 
     v = Potential(grid, (grid.values - 1) ** 2 / 10)
@@ -17,11 +17,11 @@ def test_minimize():
     dens = minimize_density_functional(
         4, grid,
         [ExternalPotential(v), VonWeizakerKE()],
-        plot=False
+        plot=plot
     )
 
     assert np.allclose(dens.particles, 4)
 
 
 if __name__ == "__main__":
-    test_minimize()
+    test_minimize(plot=True)
