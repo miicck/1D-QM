@@ -82,8 +82,7 @@ class Density(Function):
 
     @particles.setter
     def particles(self, val: float):
-        self.values /= self.particles
-        self.values *= val
+        self.values *= val / self.particles
         assert_all_close(self.particles, val)
 
     def calculate_potential(self, n_elec_tol: float = 0.01,

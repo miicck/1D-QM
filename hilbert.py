@@ -95,9 +95,19 @@ class Function:
         assert np.allclose(self.x.values, other.x.values)
         return np.trapz(self.values * other.values, self.x.values)
 
-    def plot(self):
+    def plot(self, blocking=True):
         import matplotlib.pyplot as plt
+        if not blocking:
+            plt.ion()
+
+        if not blocking:
+            plt.clf()
+
         plt.plot(self.x.values, self.values)
         plt.xlabel("$x$")
         plt.ylabel("$f(x)$")
-        plt.show()
+
+        if blocking:
+            plt.show()
+        else:
+            plt.pause(0.01)
