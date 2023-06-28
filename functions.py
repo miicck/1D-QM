@@ -1,5 +1,4 @@
 import math
-
 import numpy as np
 from qm1d.hilbert import *
 from qm1d.utils import assert_all_close
@@ -103,10 +102,10 @@ class Density(Function):
             delta_density = eig_d.values - self.values
 
             if np.trapz(abs(delta_density), self.x.values) < n_elec_tol:
-                break
+                return v
 
             v.values += delta_density
-            v.values -= max(v.values)
+            v.values -= min(v.values)
 
             if callback is not None:
                 callback(v, eig, self, eig_d)
@@ -138,3 +137,31 @@ class Density(Function):
         plt.tight_layout()
 
         plt.pause(0.001)
+
+    def plot_with_potential_and_orbitals(self):
+        import matplotlib.pyplot as plt
+        pot = self.calculate_potential()
+        orbs = pot.calculate_eigenstates()
+
+        plt.subplot(221)
+        plt.plot(self.x.values, self.values, label="Input density")
+        plt.plot(self.x.values, orbs.density(self.particles), linestyle=":", label="Density from orbitals")
+        plt.xlabel(r"$x$")
+        plt.ylabel(r"$\rho$")
+        plt.legend()
+
+        plt.subplot(222)
+        for i in range(round(self.particles)):
+            orb = orbs.orbitals[i].values
+            orb /= max(orb) - min(orb)
+            plt.plot(self.x.values, orb + i)
+            plt.axhline(i, color="black", alpha=0.2)
+        plt.xlabel(r"$x$")
+        plt.ylabel(r"$\phi_i$")
+
+        plt.subplot(223)
+        plt.plot(self.x.values, pot.values)
+        plt.xlabel(r"$x$")
+        plt.ylabel(r"$v$")
+
+        plt.show()

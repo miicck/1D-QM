@@ -1,17 +1,13 @@
 from solver import orbitals_from_density, plot_orbital_density_potential_suite
 import numpy as np
 import matplotlib.pyplot as plt
+from hilbert import *
+from functions import *
 
-N = 5
+rho = Density(Grid(-5, 5, 101))
 
-x = np.linspace(-5, 5, 101)
+x = rho.x.values
+rho.values = np.exp(-(x - 1) ** 2) ** 2 + np.exp(-(x + 1) ** 2) ** 2
+rho.particles = 5
 
-rho = np.exp(-(x-1) ** 2) ** 2 + np.exp(-(x+1) ** 2) ** 2
-rho = np.exp(-(x-2) ** 2) ** 2 + np.exp(-x ** 2) ** 2 + np.exp(-(x+2) ** 2) ** 2
-#rho = np.exp(-x**2)**2
-rho *= N / np.trapz(rho, x)
-
-evals, phi, v, history = orbitals_from_density(x, rho, plot=False, n_elec_tol=0.01)
-
-plot_orbital_density_potential_suite(x, rho, phi, N, v, history)
-plt.show()
+rho.plot_with_potential_and_orbitals()
