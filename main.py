@@ -1,4 +1,3 @@
-from solver import orbitals_from_density, plot_orbital_density_potential_suite
 import numpy as np
 import matplotlib.pyplot as plt
 from hilbert import *
