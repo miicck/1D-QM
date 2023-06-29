@@ -32,6 +32,17 @@ class HarmonicLadderOperator(LadderOperator):
         return result
 
 
+class PotentialDerivativeLadder(LadderOperator):
+
+    def __init__(self, v: Potential):
+        self._v = v
+
+    def apply(self, orbital: Orbital, density: Density = None) -> Orbital:
+        result = Orbital(orbital.x, orbital.derivative.values - 0.5 * self._v.derivative.values * orbital.values)
+        result.normalize()
+        return result
+
+
 class NormalizeToGroundState(DensityToGroundStateMap):
 
     def __init__(self, power: float = 1.0):

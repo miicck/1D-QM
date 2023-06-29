@@ -124,7 +124,8 @@ def minimize_density_functional(
         grid: Grid,
         energy_functionals: Iterable[EnergyDensityFunctional] = None,
         potential_functionals: Iterable[PotentialDensityFunctional] = None,
-        plot=False) -> Density:
+        plot=False,
+        use_multiprocessing=False) -> Density:
     from scipy.optimize import minimize
 
     energy_functionals = energy_functionals or []
@@ -134,15 +135,19 @@ def minimize_density_functional(
         return _minimize_density_functional_cost(x, particles, grid, energy_functionals, potential_functionals)
 
     def scipy_gadient(x: np.ndarray) -> np.ndarray:
-        from multiprocessing import Pool, cpu_count
 
         dn = np.identity(len(x)) * 1e-6
         f0 = _minimize_density_functional_cost(x, particles, grid, energy_functionals, potential_functionals)
 
-        with Pool(cpu_count()) as p:
-            fnew = p.starmap(_minimize_density_functional_cost,
-                             [[x + dn[i], particles, grid, energy_functionals, potential_functionals] for i in
-                              range(len(x))])
+        if use_multiprocessing:
+            from multiprocessing import Pool, cpu_count
+            with Pool(cpu_count()) as p:
+                fnew = p.starmap(_minimize_density_functional_cost,
+                                 [[x + dn[i], particles, grid, energy_functionals, potential_functionals] for i in
+                                  range(len(x))])
+        else:
+            fnew = [_minimize_density_functional_cost(
+                x + dn[i], particles, grid, energy_functionals, potential_functionals) for i in range(len(x))]
 
         g = (np.array(fnew) - f0) / dn[0, 0]
         return g

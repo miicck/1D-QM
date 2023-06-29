@@ -85,14 +85,19 @@ class Potential(Function):
 
 class Density(Function):
 
+    def on_values_change(self):
+        self._particles = None
+
     @property
     def particles(self) -> float:
-        return np.trapz(self.values, self.x.values)
+        if self._particles is None:
+            self._particles = np.trapz(self.values, self.x.values)
+        return self._particles
 
     @particles.setter
     def particles(self, val: float):
         self.values *= val / self.particles
-        assert_all_close(self.particles, val)
+        assert abs(self.particles - val) < 1e-6
 
     def calculate_potential(self, n_elec_tol: float = 0.01,
                             callback: Callable[[Potential, OrbitalSpectrum, 'Density', 'Density'], None] = None,

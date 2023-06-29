@@ -51,13 +51,16 @@ class Grid:
 class Function:
 
     def __init__(self, grid: Grid, values: np.ndarray = None):
+
         self._grid = grid
+
         if values is not None:
             values = np.array(values)
             assert values.shape == grid.values.shape
-            self._values = values
         else:
-            self._values = np.zeros(grid.values.shape)
+            values = np.zeros(grid.values.shape)
+
+        self.values = values
 
     @property
     def x(self) -> Grid:
@@ -70,6 +73,11 @@ class Function:
     @values.setter
     def values(self, val: np.ndarray):
         self._values = val
+        self._norm = None
+        self.on_values_change()
+
+    def on_values_change(self):
+        pass
 
     @property
     def derivative(self) -> 'Function':
@@ -83,13 +91,14 @@ class Function:
 
     @property
     def norm(self) -> float:
-        return self.inner_product(self) ** 0.5
+        if self._norm is None:
+            self._norm = self.inner_product(self) ** 0.5
+        return self._norm
 
     def normalize(self) -> None:
         self.values /= self.norm
 
     def inner_product(self, other: 'Function') -> float:
-        assert np.allclose(self.x.values, other.x.values)
         return np.trapz(self.values * other.values, self.x.values)
 
     def plot(self, blocking=True):
