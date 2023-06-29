@@ -14,7 +14,7 @@ def test_minimize(plot=False):
 
     v = Potential(grid, grid.values ** 2 / 10)
 
-    dens = minimize_density_functional(
+    dens, value = minimize_density_functional(
         4, grid,
         [ExternalPotential(v), VonWeizakerKE()],
         plot=plot

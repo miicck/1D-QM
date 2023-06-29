@@ -1,8 +1,8 @@
 import math
-
 import numpy as np
 from functions import *
 from typing import Iterable
+from ladder import *
 
 
 class Functional(ABC):
@@ -55,16 +55,16 @@ class ExactKineticEnergyFunctional(EnergyDensityFunctional):
         return e.kinetic_energy(density.particles)
 
 
-class BasicLadderKineticEnergyFunctional(EnergyDensityFunctional):
+class LadderKineticEnergyFunctional(EnergyDensityFunctional):
+
+    def __init__(self, ladder: LadderOperator = None, gs_map: DensityToGroundStateMap = None):
+        self._ladder = ladder or DerivativeLadderOperator()
+        self._gs_map = gs_map or NormalizeToGroundState()
 
     def apply(self, density: Density) -> float:
-        from ladder import NormalizeToGroundState, DerivativeLadderOperator
-        gs_map = NormalizeToGroundState()
-        ladder = DerivativeLadderOperator()
-
-        generated = [gs_map.apply(density)]
+        generated = [self._gs_map.apply(density)]
         while len(generated) < density.particles:
-            generated.append(ladder.apply(generated[-1]))
+            generated.append(self._ladder.apply(generated[-1]))
 
         auf = OrbitalSpectrum.aufbau_weights(density.particles)
         return sum(a * generated[i].kinetic_energy for i, a in enumerate(auf))

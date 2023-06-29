@@ -43,7 +43,6 @@ class Grid:
             for i in range(1, self.points - 1):
                 self._gradient[i, i - 1] = -0.5
                 self._gradient[i, i + 1] = 0.5
-
             self._gradient /= self.values[1] - self.values[0]
 
         return self._gradient
@@ -74,9 +73,7 @@ class Function:
 
     @property
     def derivative(self) -> 'Function':
-        dfdx = Function(self.x)
-        dfdx.values = self.x.gradient @ self.values
-        return dfdx
+        return Function(self.x, self.x.gradient @ self.values)
 
     @property
     def laplacian(self) -> 'Function':
