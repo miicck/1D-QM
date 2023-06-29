@@ -61,6 +61,14 @@ class LadderKineticEnergyFunctional(EnergyDensityFunctional):
         self._ladder = ladder or DerivativeLadderOperator()
         self._gs_map = gs_map or NormalizeToGroundState()
 
+    @property
+    def ladder(self) -> LadderOperator:
+        return self._ladder
+
+    @property
+    def gs_map(self) -> DensityToGroundStateMap:
+        return self._gs_map
+
     def apply(self, density: Density) -> float:
         generated = [self._gs_map.apply(density)]
         while len(generated) < density.particles:

@@ -7,6 +7,30 @@ from ladder import *
 from functionals import *
 
 
+def candidate_potential() -> Potential:
+    grid = Grid(-8, 8, 51)
+    return Potential(grid, 0.5 * grid.values ** 2)
+
+
+def candidate_gs_map() -> DensityToGroundStateMap:
+    return NormalizeToGroundState()
+
+
+def candidate_ladder_operator(v: Potential) -> LadderOperator:
+    return PotentialDerivativeLadder(v)
+    return DerivativeLadderOperator()
+
+
+def candidate_functionals(v: Potential):
+    return {
+        None: "Exact",
+        VonWeizakerKE(): "vW",
+        LadderKineticEnergyFunctional(
+            ladder=candidate_ladder_operator(v),
+            gs_map=candidate_gs_map()): "Ladder"
+    }
+
+
 def ladder_plot():
     # Create a two-well density
     rho = Density(Grid(-5, 5, 101))
@@ -36,34 +60,18 @@ def potential_to_density(
     return minimize_density_functional(n_elec, v.x, energy_functionals=[ExternalPotential(v), ke_functional])
 
 
-def profile_pot_to_density():
-    # Create an harmonic potential
-    grid = Grid(-8, 8, 51)
-    v = Potential(grid, 0.5 * grid.values ** 2)
-    minimize_density_functional(4, grid, energy_functionals=[ExternalPotential(v), LadderKineticEnergyFunctional()])
-
-
-def functional_density_plots(plot=True):
+def density_plots(plot=True):
     from multiprocessing import Pool, cpu_count
 
-    # Create an harmonic potential
-    grid = Grid(-8, 8, 51)
-    v = Potential(grid, 0.5 * grid.values ** 2)
+    # Get potential
+    v = candidate_potential()
 
     # Number of plots per side
     n_side = 3
     n_max = n_side ** 2
 
-    # Ladder operator and ground state map to use
-    ladder = PotentialDerivativeLadder(v)
-    gs_map = NormalizeToGroundState()
-
     # Set of kinetic energy functionals to plot, and names of each
-    ke_funcs = {
-        None: "Exact",
-        VonWeizakerKE(): "vW",
-        LadderKineticEnergyFunctional(ladder=ladder, gs_map=gs_map): "Ladder"
-    }
+    ke_funcs = candidate_functionals(v)
 
     # Arguments to parallelize over
     args = []
@@ -78,7 +86,9 @@ def functional_density_plots(plot=True):
     if not plot:
         return
 
+    # Plot some information about the exact orbitals, and how well the ground state map works
     plt.figure()
+    gs_map = candidate_gs_map()
     spectrum = v.calculate_eigenstates()
     plt.subplot(121)
     plot_orbitals(plt, spectrum.orbitals[:n_max])
@@ -88,6 +98,7 @@ def functional_density_plots(plot=True):
     plt.plot(v.x.values, spectrum.orbitals[0].values, label="phi_0")
     plt.legend()
 
+    # Plot the densities obtained by various functionals
     plt.figure()
     for i, (v, n, ke_func) in enumerate(args):
         plt.subplot(n_side, n_side, n)
@@ -96,11 +107,86 @@ def functional_density_plots(plot=True):
         plt.legend()
         plt.annotate(f"N = {n}", (0, 0))
 
+    # Plot the orbitals obtained from each density
+    plt.figure()
+    for i, (v, n, ke_func) in enumerate(args):
+        if not isinstance(ke_func, LadderKineticEnergyFunctional):
+            continue
+        plt.subplot(n_side, n_side, n)
+        d, e = results[i]
+        orbs = [ke_func.gs_map(d)]
+        while len(orbs) < n:
+            orbs.append(ke_func.ladder(orbs[-1]))
+        plot_orbitals(plt, orbs)
+
     plt.show()
 
 
+def integer_discontinuity_plots(plot=True):
+    from multiprocessing import Pool, cpu_count
+
+    def integer_interp(i, energies):
+
+        # i is at an integer value already
+        if abs(ns[i] - round(ns[i])) < 1e-5:
+            return energies[i]
+
+        # Find integer value before i
+        for j in range(i, -1, -1):
+            if abs(ns[j] - round(ns[j])) < 1e-5:
+                break
+
+        # Find integer value after i
+        for k in range(i, len(ns)):
+            if abs(ns[k] - round(ns[k])) < 1e-5:
+                break
+
+        # Interpolate between them
+        frac = (i - j) / (k - j)
+        return energies[j] * (1 - frac) + energies[k] * frac
+
+    # Get potential
+    v = candidate_potential()
+
+    # Set of kinetic energy functionals to plot, and names of each
+    ke_funcs = candidate_functionals(v)
+
+    # Arguments to parallelize over - must contain integer values
+    ns = np.linspace(0, 5, 51)
+    ns = list(ns)
+    ns.pop(0)  # Don't do 0 electrons
+    ns = np.array(ns)
+
+    # Plot results for each KE functional
+    for ke_func in ke_funcs:
+        # Get results in parallel
+        with Pool(cpu_count()) as p:
+            results = p.starmap(potential_to_density, [[v, n, ke_func] for n in ns])
+
+        if not plot:
+            continue
+
+        es = [r[1] for r in results]
+
+        plt.subplot(211)
+        plt.plot(ns, es, marker="+", label=ke_funcs[ke_func])
+        plt.legend()
+        plt.xlabel("N")
+        plt.ylabel("E(N)")
+
+        plt.subplot(212)
+        plt.plot(ns, [es[i] - integer_interp(i, es) for i in range(len(ns))], label=ke_funcs[ke_func])
+        plt.legend()
+        plt.xlabel("N")
+        plt.ylabel("E(N) - E(piecewise linear)")
+
+    if plot:
+        plt.show()
+
+
 def main(plot=True):
-    functional_density_plots(plot=plot)
+    integer_discontinuity_plots(plot=plot)
+    density_plots(plot=plot)
 
 
 if __name__ == "__main__":

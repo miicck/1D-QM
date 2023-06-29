@@ -56,7 +56,8 @@ class Function:
 
         if values is not None:
             values = np.array(values)
-            assert values.shape == grid.values.shape
+            assert values.shape == grid.values.shape, \
+                f"Values shape = {values.shape} != grid shape = {grid.values.shape}"
         else:
             values = np.zeros(grid.values.shape)
 
