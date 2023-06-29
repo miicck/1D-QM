@@ -8,12 +8,18 @@ class LadderOperator(ABC):
     def apply(self, orbital: Orbital, density: Density = None) -> Orbital:
         raise NotImplementedError()
 
+    def __call__(self, *args, **kwargs):
+        return self.apply(*args, **kwargs)
+
 
 class DensityToGroundStateMap(ABC):
 
     @abstractmethod
     def apply(self, denisty: Density) -> Orbital:
         raise NotImplementedError()
+
+    def __call__(self, *args, **kwargs):
+        return self.apply(*args, **kwargs)
 
 
 class DerivativeLadderOperator(LadderOperator):

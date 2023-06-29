@@ -98,6 +98,12 @@ class Function:
     def normalize(self) -> None:
         self.values /= self.norm
 
+    @property
+    def normalized(self) -> 'Function':
+        f = Function(self.x, self.values)
+        f.normalize()
+        return f
+
     def inner_product(self, other: 'Function') -> float:
         return np.trapz(self.values * other.values, self.x.values)
 

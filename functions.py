@@ -83,6 +83,7 @@ class Potential(Function):
         return OrbitalSpectrum(eigenvalues, orbitals)
 
 
+
 class Density(Function):
 
     def on_values_change(self):
