@@ -9,16 +9,40 @@ from functionals import *
 
 def candidate_potential() -> Potential:
     grid = Grid(-8, 8, 51)
-    return Potential(grid, 0.5 * grid.values ** 2)
+    return Potential(grid, 0.5 * grid.values ** 2)  # Harmonic oscilaltor
+    return Potential(grid, -4 / (abs(grid.values - 2) * 8 + 1) - 4 / (abs(grid.values + 2) * 8 + 1))  # Double well
+    return Potential(grid, -1 / (abs(grid.values) + 1))  # Single well
+    return Potential(grid, 0.5 * grid.values ** 4 - 4 * grid.values ** 2)  # Anharmonic oscillator
 
 
-def candidate_gs_map() -> DensityToGroundStateMap:
-    return NormalizeToGroundState()
+def candidate_gs_map_ladder_combo(v: Potential) -> Tuple[DensityToGroundStateMap, LadderOperator]:
+    # External potential-blind operators
+    # Motivation:
+    #     Strictly speaking, the KE functional should not depend
+    #     on the external potential. These operators depend strictly
+    #     on the density (either explicitly, or through ladder-operator
+    #     generated orbitals).
+    return NormalizeToGroundState(), DerivativeLadderOperator()
+
+    # Use density for ground state, potential for ladder
+    return NormalizeToGroundState(), PotentialDerivativeLadder(v)
+
+    # Use potential for ground state, density for ladder
+    return PotentialBiasedGroundState(v, v_mix=1.0), DensityDerivativeLadder()
+
+    # Ground state generated exactly
+    # Motivation:
+    #     Given an external potential, the ground state for a 1-electron system
+    #     can be found exactly, and looks a lot like the lowest orbital, so use that.
+    return PotentialBiasedGroundState(v, v_mix=1.0), PotentialDerivativeLadder(v)
+
+
+def candidate_gs_map(v: Potential) -> DensityToGroundStateMap:
+    return candidate_gs_map_ladder_combo(v)[0]
 
 
 def candidate_ladder_operator(v: Potential) -> LadderOperator:
-    return PotentialDerivativeLadder(v)
-    return DerivativeLadderOperator()
+    return candidate_gs_map_ladder_combo(v)[1]
 
 
 def candidate_functionals(v: Potential):
@@ -27,20 +51,8 @@ def candidate_functionals(v: Potential):
         VonWeizakerKE(): "vW",
         LadderKineticEnergyFunctional(
             ladder=candidate_ladder_operator(v),
-            gs_map=candidate_gs_map()): "Ladder"
+            gs_map=candidate_gs_map(v)): "Ladder"
     }
-
-
-def ladder_plot():
-    # Create a two-well density
-    rho = Density(Grid(-5, 5, 101))
-    x = rho.x.values
-    rho.values = np.exp(-(x - 1) ** 2) ** 2 + 0.5 * np.exp(-(x + 1) ** 2) ** 2
-    rho.values = np.exp(-x ** 2 / 2)
-    rho.particles = 4
-
-    # Plot comparison with ladder operator
-    plot_ladder_result(rho)
 
 
 def potential_to_density(
@@ -58,6 +70,67 @@ def potential_to_density(
         return d_exact, e_exact
 
     return minimize_density_functional(n_elec, v.x, energy_functionals=[ExternalPotential(v), ke_functional])
+
+
+def plot_exact_ladder_operators():
+    v = candidate_potential()
+    spectrum = v.calculate_eigenstates()
+    ladder = candidate_ladder_operator(v)
+
+    ladder_op_from_proj = sum(
+        spectrum.orbitals[i].outer_product(spectrum.orbitals[i - 1])
+        for i in range(1, len(spectrum.orbitals))
+    )
+
+    i_max = 5
+    i_cols = 8
+
+    for i in range(1, i_max + 1):
+        # Plot orbital before
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 1)
+        plt.plot(v.x.values, spectrum.orbitals[i - 1].values)
+
+        # Plot exact ladder operator
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 3)
+        plt.imshow(ladder_op_from_proj)
+        plt.xlabel("Exact ladder operator")
+
+        # Plot orbitals after application of exact ladder operator
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 4)
+        plt.plot(v.x.values, ladder_op_from_proj @ spectrum.orbitals[i - 1].values)
+
+        # Plot approximate ladder operator
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 5)
+        plt.imshow(ladder.matrix_elements(v.x, spectrum.density(i)))
+        plt.xlabel("Approximate ladder operator")
+
+        # Plot orbitals after approximate ladder operator
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 6)
+        plt.plot(v.x.values, ladder.apply(spectrum.orbitals[i - 1], None).values)
+
+        # Plot projection operator
+        proj = spectrum.orbitals[i].outer_product(spectrum.orbitals[i - 1])
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 7)
+        plt.imshow(proj)
+        plt.xlabel(f"|{i + 1}><{i}|")
+
+        # Plot orbitals after application of projection operator
+        plt.subplot(i_max, i_cols, (i - 1) * i_cols + 8)
+        plt.plot(v.x.values, proj @ spectrum.orbitals[i - 1].values)
+
+    plt.subplots_adjust(hspace=0.0)
+
+    # Plot exact ladder operator from sum of
+    # projection operators, and the one we're using
+    plt.figure()
+    plt.subplot(221)
+    plt.imshow(ladder_op_from_proj)
+    plt.subplot(222)
+    plt.imshow(ladder.matrix_elements(v.x, spectrum.density(1)))
+    plt.subplot(223)
+    plt.plot(v.x.values, v.values)
+
+    plt.show()
 
 
 def density_plots(plot=True):
@@ -88,7 +161,7 @@ def density_plots(plot=True):
 
     # Plot some information about the exact orbitals, and how well the ground state map works
     plt.figure()
-    gs_map = candidate_gs_map()
+    gs_map = candidate_gs_map(v)
     spectrum = v.calculate_eigenstates()
     plt.subplot(121)
     plot_orbitals(plt, spectrum.orbitals[:n_max])
@@ -98,8 +171,13 @@ def density_plots(plot=True):
     plt.plot(v.x.values, spectrum.orbitals[0].values, label="phi_0")
     plt.legend()
 
+    plt.subplot(224)
+    plt.plot(v.x.values, v.values)
+    plt.ylabel("v")
+
     # Plot the densities obtained by various functionals
     plt.figure()
+    plt.suptitle("GS densities")
     for i, (v, n, ke_func) in enumerate(args):
         plt.subplot(n_side, n_side, n)
         d, e = results[i]
@@ -109,6 +187,7 @@ def density_plots(plot=True):
 
     # Plot the orbitals obtained from each density
     plt.figure()
+    plt.suptitle("Generated orbitals for ladder GS density")
     for i, (v, n, ke_func) in enumerate(args):
         if not isinstance(ke_func, LadderKineticEnergyFunctional):
             continue
@@ -116,7 +195,7 @@ def density_plots(plot=True):
         d, e = results[i]
         orbs = [ke_func.gs_map(d)]
         while len(orbs) < n:
-            orbs.append(ke_func.ladder(orbs[-1]))
+            orbs.append(ke_func.ladder(orbs[-1], d))
         plot_orbitals(plt, orbs)
 
     plt.show()
@@ -185,8 +264,9 @@ def integer_discontinuity_plots(plot=True):
 
 
 def main(plot=True):
-    integer_discontinuity_plots(plot=plot)
     density_plots(plot=plot)
+    integer_discontinuity_plots(plot=plot)
+    plot_exact_ladder_operators()
 
 
 if __name__ == "__main__":

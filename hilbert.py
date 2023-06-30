@@ -108,6 +108,9 @@ class Function:
     def inner_product(self, other: 'Function') -> float:
         return np.trapz(self.values * other.values, self.x.values)
 
+    def outer_product(self, other: 'Function') -> np.ndarray:
+        return np.outer(self.values, other.values)
+
     def plot(self, blocking=True):
         import matplotlib.pyplot as plt
         if not blocking:

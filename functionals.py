@@ -72,7 +72,7 @@ class LadderKineticEnergyFunctional(EnergyDensityFunctional):
     def apply(self, density: Density) -> float:
         generated = [self._gs_map.apply(density)]
         while len(generated) < density.particles:
-            generated.append(self._ladder.apply(generated[-1]))
+            generated.append(self._ladder.apply(generated[-1], density=density))
 
         auf = OrbitalSpectrum.aufbau_weights(density.particles)
         return sum(a * generated[i].kinetic_energy for i, a in enumerate(auf))
