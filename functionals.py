@@ -109,6 +109,9 @@ class KELDA(EnergyDensityFunctional):
         self._interp = None
         self._force_interp = force_interp
 
+    def lda(self, density: float):
+        return self._interp(density)
+
     def apply(self, density: Density, plot=False) -> float:
 
         # N used to evaluate KE-LDA
