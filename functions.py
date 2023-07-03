@@ -30,6 +30,18 @@ class OrbitalSpectrum:
         auf = OrbitalSpectrum.aufbau_weights(particles)
         return sum(a * self.orbitals[i].kinetic_energy for i, a in enumerate(auf))
 
+    def kinetic_energy_density(self, particles: float) -> Function:
+        auf = OrbitalSpectrum.aufbau_weights(particles)
+
+        ke_dens = sum(-0.5 * a * self.orbitals[i].values * self.orbitals[i].laplacian.values
+                      for i, a in enumerate(auf))
+
+        d = self.density(particles)
+        ke_dens /= d.values  # + 1e-5
+        ke_dens[d.values < 1e-5] = 0.0
+
+        return Function(self.orbitals[0].x, ke_dens)
+
     def density(self, particles: float) -> 'Density':
         """
         Evaluate the density that results from filling these
@@ -81,7 +93,6 @@ class Potential(Function):
             orbitals.append(orb_i)
 
         return OrbitalSpectrum(eigenvalues, orbitals)
-
 
 
 class Density(Function):

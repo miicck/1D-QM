@@ -55,6 +55,37 @@ def test_density_from_orbitals():
     assert delta_d.particles < 0.1
 
 
+def test_ke_from_orbitals(plot=False):
+    grid = Grid(-8, 8, 101)
+    v = Potential(grid, 0.5 * grid.values ** 2)
+    spectrum = v.calculate_eigenstates()
+
+    if plot:
+        import matplotlib.pyplot as plt
+        from functionals import KELDA
+        N = 2
+        rho = spectrum.density(N)
+        ke_dens = spectrum.kinetic_energy_density(N)
+
+        print(KELDA(v).apply(rho, plot=plot), spectrum.kinetic_energy(N))
+
+        plt.subplot(121)
+        plt.plot(v.x.values, v.values, label="v")
+        plt.plot(v.x.values, rho.values, label="rho")
+        plt.plot(v.x.values, ke_dens.values, label="tau")
+        plt.plot(v.x.values, v.values + ke_dens.values, label="v + tau")
+
+        plt.subplot(122)
+        from ladder import plot_orbitals
+        plot_orbitals(plt, spectrum.orbitals[:N])
+
+        plt.legend()
+        plt.show()
+
+    assert np.allclose(spectrum.kinetic_energy(5.5),
+                       spectrum.kinetic_energy_density(5.5).inner_product(spectrum.density(5.5)))
+
+
 def test_aufbau():
     assert np.allclose(OrbitalSpectrum.aufbau_weights(1.5), [1, 0.5])
     assert np.allclose(OrbitalSpectrum.aufbau_weights(1.0), [1])

@@ -10,9 +10,9 @@ from functionals import *
 def candidate_potential() -> Potential:
     grid = Grid(-8, 8, 51)
     return Potential(grid, 0.5 * grid.values ** 2)  # Harmonic oscilaltor
+    return Potential(grid, 0.5 * grid.values ** 4 - 4 * grid.values ** 2)  # Anharmonic oscillator
     return Potential(grid, -4 / (abs(grid.values - 2) * 8 + 1) - 4 / (abs(grid.values + 2) * 8 + 1))  # Double well
     return Potential(grid, -1 / (abs(grid.values) + 1))  # Single well
-    return Potential(grid, 0.5 * grid.values ** 4 - 4 * grid.values ** 2)  # Anharmonic oscillator
 
 
 def candidate_gs_map_ladder_combo(v: Potential) -> Tuple[DensityToGroundStateMap, LadderOperator]:
@@ -51,7 +51,8 @@ def candidate_functionals(v: Potential):
         VonWeizakerKE(): "vW",
         LadderKineticEnergyFunctional(
             ladder=candidate_ladder_operator(v),
-            gs_map=candidate_gs_map(v)): "Ladder"
+            gs_map=candidate_gs_map(v)): "Ladder",
+        KELDA(v, force_interp=True): "KELDA"
     }
 
 

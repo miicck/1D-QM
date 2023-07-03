@@ -78,6 +78,120 @@ class LadderKineticEnergyFunctional(EnergyDensityFunctional):
         return sum(a * generated[i].kinetic_energy for i, a in enumerate(auf))
 
 
+class LocalKEDensityEnergyFunctional(EnergyDensityFunctional):
+
+    def __init__(self, potential: Potential):
+        self._v = potential
+        self._spectrum = potential.calculate_eigenstates()
+        self._ke_density = None
+        self._ke_density_particles = None
+
+    def apply(self, density: Density) -> float:
+
+        if self._ke_density is None:
+            self._ke_density = self._spectrum.kinetic_energy_density(density.particles)
+            self._ke_density_particles = density.particles
+
+        if abs(self._ke_density_particles - density.particles) > 1e-6:
+            self._ke_density = None
+            self._ke_density_particles = None
+            return self.apply(density)
+
+        return self._ke_density.inner_product(density)
+
+
+class KELDA(EnergyDensityFunctional):
+
+    def __init__(self, potential: Potential, force_interp=False):
+        self._v = potential
+        self._spectrum = potential.calculate_eigenstates()
+        self._last_particles = None
+        self._interp = None
+        self._force_interp = force_interp
+
+    def apply(self, density: Density, plot=False) -> float:
+
+        # N used to evaluate KE-LDA
+        effective_n = density.particles
+
+        if self._last_particles is None or abs(effective_n - self._last_particles) > 1e-6:
+            from scipy.interpolate import interp1d
+            from scipy.optimize import curve_fit
+
+            self._last_particles = effective_n
+            ref_ke = self._spectrum.kinetic_energy_density(self._last_particles).values
+            ref_density = self._spectrum.density(self._last_particles).values
+
+            # Throw away low-density data
+            i_keep = ref_density > 1e-5
+            ref_density = ref_density[i_keep]
+            ref_ke = ref_ke[i_keep]
+
+            def to_fit(d, c0, c1, p1, c2, p2):
+                return c0 + c1 * (d ** p1) + c2 * (d ** p2)
+
+            try:
+                # Try fitting to curve
+                if self._force_interp:
+                    raise RuntimeError
+                par, cov = curve_fit(to_fit, ref_density, ref_ke)
+                self._interp = lambda d: to_fit(d, *par)
+
+            except RuntimeError as e:
+                # Fallback to interpolation
+
+                # Get single-valued version of data
+                sv = []
+                for i in range(len(ref_density)):
+                    if len(sv) == 0 or ref_density[i] > sv[-1][0]:
+                        sv.append([ref_density[i], ref_ke[i]])
+                sv = np.array(sv).T
+
+                # Build interpolation
+                scipy_interp = interp1d(sv[0], sv[1])
+
+                d_min, d_max = min(sv[0]), max(sv[0])
+
+                eps = 1e-4
+                f_dmax = scipy_interp(d_max)
+                f_dmin = scipy_interp(d_min)
+                dfdx_dmax = (scipy_interp(d_max) - scipy_interp(d_max - eps)) / eps
+                dfdx_dmin = (scipy_interp(d_min + eps) - scipy_interp(d_min)) / eps
+
+                def interp_single(d):
+                    try:
+                        return scipy_interp(d)
+                    except ValueError:
+
+                        if d > d_max - eps:
+                            # Linear extrapolation
+                            return (d - d_max) * dfdx_dmax + f_dmax
+
+                        if d < d_min + eps:
+                            # Linear extrapolation
+                            return (d - d_min) * dfdx_dmin + f_dmin
+
+                        return 0.0
+
+                def interp(d):
+                    return np.array([interp_single(x) for x in d])
+
+                self._interp = interp
+                if not self._force_interp:
+                    print(f"KELDA fit failed for N = {density.particles} (eff = {effective_n})")
+
+            if plot:
+                import matplotlib.pyplot as plt
+                x = np.linspace(0, 2 * max(ref_density), 1000)
+                plt.plot(ref_density, ref_ke, label="Reference data")
+                plt.plot(x, self._interp(x), label="KELDA fit")
+                plt.ylim(min(ref_ke) - 2, max(ref_ke) + 2)
+                plt.legend()
+                plt.show()
+
+        return density.inner_product(Function(density.x, self._interp(density.values)))
+
+
 class GuassianRepulsion(PotentialDensityFunctional):
 
     def apply(self, density: Density) -> Potential:
