@@ -51,7 +51,7 @@ class ExactKineticEnergyFunctional(EnergyDensityFunctional):
     def apply(self, density: Density) -> float:
         v = density.calculate_potential(n_elec_tol=self._n_elec_tol,
                                         max_iter=self._max_iter)
-        e = v.calculate_eigenstates()
+        e = v.diagonalize_hamiltonian()
         return e.kinetic_energy(density.particles)
 
 
@@ -82,7 +82,7 @@ class LocalKEDensityEnergyFunctional(EnergyDensityFunctional):
 
     def __init__(self, potential: Potential):
         self._v = potential
-        self._spectrum = potential.calculate_eigenstates()
+        self._spectrum = potential.diagonalize_hamiltonian()
         self._ke_density = None
         self._ke_density_particles = None
 
@@ -105,13 +105,13 @@ class KELDA(EnergyDensityFunctional):
     def __init__(self, potential: Potential, particles: float):
         self._potential = potential
         self._particles = particles
-        self._lda = None
+        self._t_lda = None
 
     def derive_lda(self):
         from scipy.interpolate import interp1d
         from scipy.optimize import curve_fit
 
-        spectrum = self._potential.calculate_eigenstates()
+        spectrum = self._potential.diagonalize_hamiltonian()
         ref_ke = spectrum.kinetic_energy_density(self._particles).values
         ref_density = spectrum.density(self._particles).values
 
@@ -121,10 +121,10 @@ class KELDA(EnergyDensityFunctional):
         ref_ke = ref_ke[i_keep]
 
         # Get single-valued version of data
-        sv = []
+        sv = [(ref_density[0], ref_ke[0])]
         for i in range(len(ref_density)):
-            if len(sv) == 0 or ref_density[i] > sv[-1][0]:
-                sv.append([ref_density[i], ref_ke[i]])
+            if ref_density[i] > sv[-1][0]:
+                sv.append((ref_density[i], ref_ke[i]))
         sv = np.array(sv).T
 
         # Build interpolation
@@ -138,30 +138,28 @@ class KELDA(EnergyDensityFunctional):
         dfdx_dmax = (scipy_interp(d_max) - scipy_interp(d_max - eps)) / eps
         dfdx_dmin = (scipy_interp(d_min + eps) - scipy_interp(d_min)) / eps
 
-        def interp_single(d):
-            try:
-                return scipy_interp(d)
-            except ValueError:
+        def t_lda(density: np.ndarray):
 
-                if d > d_max - eps:
-                    # Linear extrapolation
-                    return (d - d_max) * dfdx_dmax + f_dmax
+            result = np.zeros(density.shape)
 
-                if d < d_min + eps:
-                    # Linear extrapolation
-                    return (d - d_min) * dfdx_dmin + f_dmin
+            # Generate in-range result using interpolator
+            d_in_range = np.logical_and(density < d_max, density > d_min)
+            result[d_in_range] = scipy_interp(density[d_in_range])
 
-                return 0.0
+            # Generate out-of-range results using linear extrapolation
+            d_less = density <= d_min
+            result[d_less] = (density[d_less] - d_min) * dfdx_dmin + f_dmin
+            d_more = density >= d_max
+            result[d_more] = (density[d_more] - d_max) * dfdx_dmax + f_dmax
 
-        def interp(d):
-            return np.array([interp_single(x) for x in d])
+            return result
 
-        self._lda = interp
+        self._t_lda = t_lda
 
     def t_lda(self, density):
-        if self._lda is None:
+        if self._t_lda is None:
             self.derive_lda()
-        return self._lda(density)
+        return self._t_lda(density)
 
     def apply(self, density: Density, plot=False) -> float:
 

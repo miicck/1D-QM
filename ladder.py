@@ -96,7 +96,7 @@ class PotentialBiasedGroundState(DensityToGroundStateMap):
         self._v_power = v_power
         self._d_power = d_power
         self._v_mix = v_mix
-        self._v_orbital =v.calculate_eigenstates().orbitals[0]
+        self._v_orbital =v.diagonalize_hamiltonian().orbitals[0]
 
     def apply(self, denisty: Density) -> Orbital:
         d_orbital = Orbital(denisty.x, denisty.values ** self._d_power).normalized
@@ -134,7 +134,7 @@ def plot_ladder_result(density: Density,
     ladder = ladder or DerivativeLadderOperator()
 
     pot = density.calculate_potential()
-    orbs = pot.calculate_eigenstates()
+    orbs = pot.diagonalize_hamiltonian()
 
     plt.subplot(221)
     plt.plot(density.x.values, density.values, label="Input density")

@@ -10,7 +10,7 @@ def plot_harmonic_oscillator_exact_density_t():
     v.values = 0.5 * v.x.values ** 2
 
     N = 5
-    s = v.calculate_eigenstates()
+    s = v.diagonalize_hamiltonian()
     d = s.density(N)
     k = s.kinetic_energy_density(N)
 
@@ -29,7 +29,7 @@ def plot_harmonic_oscillator_exact_t_lda():
     v.values = 0.5 * v.x.values ** 2
 
     N = 5
-    s = v.calculate_eigenstates()
+    s = v.diagonalize_hamiltonian()
     d = s.density(N)
     k = s.kinetic_energy_density(N)
 
@@ -58,8 +58,11 @@ def plot_harmonic_oscillator_exact_t_lda():
     plt.show()
 
 
-def plot_densities(v: Potential, ke_functionals: Dict[str, Callable[[Dict], EnergyDensityFunctional]]):
-    s = v.calculate_eigenstates()
+def plot_densities(v: Potential,
+                   ke_functionals: Dict[str, Callable[[Dict], EnergyDensityFunctional]],
+                   use_multiprocessing: bool = True,
+                   show_plot: bool = True):
+    s = v.diagonalize_hamiltonian()
     n_side = 3
     n_values = range(1, n_side * n_side + 1)
 
@@ -67,8 +70,12 @@ def plot_densities(v: Potential, ke_functionals: Dict[str, Callable[[Dict], Ener
     results = {}
     for name in ke_functionals:
         args = [[n, v.x, [ExternalPotential(v), ke_functionals[name]({"N": n})]] for n in n_values]
-        with Pool(cpu_count()) as p:
-            results[name] = p.starmap(minimize_density_functional, args)
+
+        if use_multiprocessing:
+            with Pool(cpu_count()) as p:
+                results[name] = p.starmap(minimize_density_functional, args)
+        else:
+            results[name] = [minimize_density_functional(*a) for a in args]
 
     # Get exact results
     exact_results = [s.density(n) for n in n_values]
@@ -95,21 +102,22 @@ def plot_densities(v: Potential, ke_functionals: Dict[str, Callable[[Dict], Ener
     plt.ylabel(r"$E$")
     plt.legend()
 
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
-def plot_harmonic_oscillator_densities():
+def plot_harmonic_oscillator_densities(profile=False):
     v = Potential(Grid(-8, 8, 51))
     v.values = 0.5 * v.x.values ** 2
     plot_densities(v, {
         "KELDA": lambda info: KELDA(v, info["N"]),
         "vW": lambda info: VonWeizakerKE(),
         "Ladder": lambda info: LadderKineticEnergyFunctional()
-    })
+    }, show_plot=not profile, use_multiprocessing=not profile)
 
 
 def plot_ladder_operators(v: Potential, ladder: LadderOperator):
-    spectrum = v.calculate_eigenstates()
+    spectrum = v.diagonalize_hamiltonian()
 
     # Evaluate exact ladder operator from sum of projection operators
     ladder_op_from_proj = sum(

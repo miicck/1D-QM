@@ -71,7 +71,7 @@ class OrbitalSpectrum:
 
 class Potential(Function):
 
-    def calculate_eigenstates(self) -> OrbitalSpectrum:
+    def diagonalize_hamiltonian(self) -> OrbitalSpectrum:
         # Evaluate the hamiltonian
         h = -0.5 * self.x.laplacian + np.diag(self.values)
         eigenvalues, eigenvectors = np.linalg.eigh(h)
@@ -122,7 +122,7 @@ class Density(Function):
         for iteration in range(max_iter):
 
             # Diagonalize the potential
-            eig = v.calculate_eigenstates()
+            eig = v.diagonalize_hamiltonian()
 
             # Evaluate the resulting density
             eig_d = eig.density(self.particles)

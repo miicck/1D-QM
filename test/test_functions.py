@@ -23,7 +23,7 @@ def test_density_particles():
 def test_potential_eigenstates():
     v = Potential(Grid(-20, 20, 1001))
     v.values = v.x.values ** 2
-    eigs = v.calculate_eigenstates()
+    eigs = v.diagonalize_hamiltonian()
 
     # Check eigenvalues are correct
     omega = 2 ** 0.5
@@ -50,7 +50,7 @@ def test_density_from_orbitals():
     d.values = np.exp(-(d.x.values - 1) ** 2) + np.exp(-(d.x.values + 1) ** 2)
     d.particles = 3
     v = d.calculate_potential(n_elec_tol=0.1)
-    e = v.calculate_eigenstates()
+    e = v.diagonalize_hamiltonian()
     delta_d = Density(d.x, abs(e.density(3).values - d.values))
     assert delta_d.particles < 0.1
 
@@ -58,7 +58,7 @@ def test_density_from_orbitals():
 def test_ke_from_orbitals(plot=False):
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
-    spectrum = v.calculate_eigenstates()
+    spectrum = v.diagonalize_hamiltonian()
 
     if plot:
         import matplotlib.pyplot as plt

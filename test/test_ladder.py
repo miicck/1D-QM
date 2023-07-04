@@ -7,7 +7,7 @@ def test_harmonic_ladder(plot=False):
     v.values = v.x.values ** 2
 
     # Diagonalize
-    spec = v.calculate_eigenstates()
+    spec = v.diagonalize_hamiltonian()
 
     target = spec.orbitals[:10]
 

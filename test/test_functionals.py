@@ -44,7 +44,7 @@ def test_kelda(plot=False):
 
             plt.subplot(1 + len(potentials) // n_cols, n_cols, i + 1)
 
-            spectrum = v.calculate_eigenstates()
+            spectrum = v.diagonalize_hamiltonian()
             n_max = 4
 
             for n in range(1, n_max + 1):

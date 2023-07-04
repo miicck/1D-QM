@@ -14,6 +14,10 @@ class Grid:
         return self._values
 
     @property
+    def spacing(self) -> float:
+        return self._values[1] - self._values[0]
+
+    @property
     def points(self) -> int:
         return len(self.values)
 
@@ -106,7 +110,7 @@ class Function:
         return f
 
     def inner_product(self, other: 'Function') -> float:
-        return np.trapz(self.values * other.values, self.x.values)
+        return np.trapz(self.values * other.values, dx=self.x.spacing)
 
     def outer_product(self, other: 'Function') -> np.ndarray:
         return np.outer(self.values, other.values)
