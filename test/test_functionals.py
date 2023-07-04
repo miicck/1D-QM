@@ -57,7 +57,7 @@ def test_kelda(plot=False):
 
                 x = np.linspace(min(rho.values), max(rho.values), 1000)
 
-                plt.plot(x, kelda.lda(x), color=(f, 1 - f, 0), linestyle=":")
+                plt.plot(x, kelda.t_lda(x), color=(f, 1 - f, 0), linestyle=":")
                 plt.plot(rho.values, ke_dens.values, color=(f, 1 - f, 0))
 
             plt.xlabel("density")
