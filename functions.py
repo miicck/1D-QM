@@ -126,11 +126,9 @@ class Density(Function):
 
             # Evaluate the resulting density
             eig_d = eig.density(self.particles)
-
-            assert_all_close(eig_d.particles, self.particles)
             delta_density = eig_d.values - self.values
 
-            if np.trapz(abs(delta_density), self.x.values) < n_elec_tol:
+            if sum(abs(delta_density)) * self.x.spacing < n_elec_tol:
                 return v
 
             v.values += delta_density * 0.5

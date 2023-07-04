@@ -59,7 +59,7 @@ def plot_harmonic_oscillator_exact_t_lda():
 
 
 def plot_densities(v: Potential,
-                   ke_functionals: Dict[str, Callable[[Dict], EnergyDensityFunctional]],
+                   ke_functionals: Dict[str, Callable[[Dict], DensityFunctional]],
                    use_multiprocessing: bool = True,
                    show_plot: bool = True):
     s = v.diagonalize_hamiltonian()
@@ -69,7 +69,14 @@ def plot_densities(v: Potential,
     # Get densities using KELDA
     results = {}
     for name in ke_functionals:
-        args = [[n, v.x, [ExternalPotential(v), ke_functionals[name]({"N": n})]] for n in n_values]
+
+        def energy_functional(n):
+            return CombinedDensityFunctional([
+                ExternalPotential(v),
+                ke_functionals[name]({"N": n})
+            ])
+
+        args = [[n, v.x, energy_functional(n)] for n in n_values]
 
         if use_multiprocessing:
             with Pool(cpu_count()) as p:
@@ -112,7 +119,7 @@ def plot_harmonic_oscillator_densities(profile=False):
     plot_densities(v, {
         "KELDA": lambda info: KELDA(v, info["N"]),
         "vW": lambda info: VonWeizakerKE(),
-        "Ladder": lambda info: LadderKineticEnergyFunctional()
+        "Ladder": lambda info: LadderKineticFunctional()
     }, show_plot=not profile, use_multiprocessing=not profile)
 
 

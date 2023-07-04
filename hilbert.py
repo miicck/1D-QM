@@ -110,7 +110,7 @@ class Function:
         return f
 
     def inner_product(self, other: 'Function') -> float:
-        return np.trapz(self.values * other.values, dx=self.x.spacing)
+        return sum(self.values * other.values) * self.x.spacing
 
     def outer_product(self, other: 'Function') -> np.ndarray:
         return np.outer(self.values, other.values)

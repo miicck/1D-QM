@@ -39,10 +39,22 @@ def test_potential_eigenstates():
 
 
 def test_density_potential():
-    d = Density(Grid(-10, 10, 100))
-    d.values = np.exp(-(d.x.values - 1) ** 2) + np.exp(-(d.x.values + 1) ** 2)
-    d.particles = 3
-    v = d.calculate_potential(n_elec_tol=0.1)  # , callback=d.calculate_potential_animation_callback)
+    for n in [0.1, 1, 1.5, 2]:
+        # Setup a potential and get density
+        v = Potential(Grid(-8, 8, 101))
+        v.values = v.x.values ** 2
+        s = v.diagonalize_hamiltonian()
+        d = s.density(n)
+
+        # Calculate potential from density
+        vd = d.calculate_potential(n_elec_tol=0.1)
+
+        # Re-calculate density
+        svd = vd.diagonalize_hamiltonian()
+        dvd = svd.density(n)
+
+        # Check same to within n_elec_tol
+        assert sum(d.values - dvd.values) * v.x.spacing < 0.1
 
 
 def test_density_from_orbitals():

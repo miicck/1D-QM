@@ -1,26 +1,28 @@
 import matplotlib.pyplot as plt
+import numpy as np
 from functionals import *
 
 
-def test_guassian_repulsion():
-    density = Density(Grid(-10, 10, 101))
-    density.values = np.exp(-density.x.values ** 2)
-    density.particles = 2
-    v = GuassianRepulsion()(density)
+def test_gradient():
+    grid = Grid(-8, 8, 101)
+    v = Potential(grid, 0.5 * grid.values ** 2)
+    functional = ExternalPotential(v)
+    d = Density(v.x)
+    df_dro = functional.functional_derivative_finite_difference(d)
+
+    assert np.allclose(df_dro.values, functional.functional_derivative(d).values)
+
+    for n in range(100):
+        dd = Density(v.x, np.random.random(d.values.shape) * 1e-6)
+        assert np.allclose(functional(dd), df_dro.inner_product(dd))
 
 
-def test_minimize(plot=False):
-    grid = Grid(-10, 10, 22)
-
-    v = Potential(grid, grid.values ** 2 / 10)
-
-    dens, value = minimize_density_functional(
-        4, grid,
-        [ExternalPotential(v), VonWeizakerKE()],
-        plot=plot
-    )
-
-    assert np.allclose(dens.particles, 4)
+def test_minimize():
+    grid = Grid(-8, 8, 22)
+    v = Potential(grid, 0.5 * grid.values ** 2)
+    functional = CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()])
+    density, energy = minimize_density_functional(4, grid, functional)
+    assert np.allclose(density.particles, 4)
 
 
 def test_kelda(plot=False):
