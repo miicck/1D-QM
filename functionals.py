@@ -58,6 +58,9 @@ class ExternalPotential(DensityFunctional):
     def apply(self, density: Density) -> float:
         return density.inner_product(self.v_ext)
 
+    def functional_derivative(self, density: Density) -> Function:
+        return self._v_ext
+
 
 class ExactKineticFunctional(DensityFunctional):
 
@@ -178,13 +181,16 @@ class KELDA(DensityFunctional):
             self.derive_lda()
         return self._t_lda(density)
 
-    def apply(self, density: Density, plot=False) -> float:
+    def v_eff(self, density: Density) -> Potential:
 
         if abs(density.particles - self._particles) > 1e-5:
             raise Exception(f"Tried to use KELDA derived for N = {self._particles} "
                             f"on a density with N = {density.particles}")
 
-        return density.inner_product(Function(density.x, self.t_lda(density.values)))
+        return Potential(density.x, self.t_lda(density.values))
+
+    def apply(self, density: Density, plot=False) -> float:
+        return density.inner_product(self.v_eff(density))
 
 
 class CombinedDensityFunctional(DensityFunctional):
@@ -194,7 +200,13 @@ class CombinedDensityFunctional(DensityFunctional):
         self._weights = np.ones(len(self._functionals)) if weights is None else list(weights)
 
     def apply(self, density: Density) -> float:
-        return sum(w * f(density) for w, f in zip(self._weights, self._functionals))
+        return sum(w * f(density)
+                   for w, f in zip(self._weights, self._functionals))
+
+    def functional_derivative(self, density: Density) -> Function:
+        vals = sum(w * f.functional_derivative(density).values
+                   for w, f in zip(self._weights, self._functionals))
+        return Function(density.x, vals)
 
 
 def minimize_density_functional(
@@ -203,16 +215,27 @@ def minimize_density_functional(
         functional: DensityFunctional) -> Density:
     from scipy.optimize import minimize
 
-    def x_to_density(x: np.ndarray) -> Density:
-        d = Density(grid, x ** 2)
-        d.particles = particles
+    identity = np.identity(len(grid.values))
+
+    def rho_of_x(x: np.ndarray) -> Density:
+        x2 = x ** 2
+        d = Density(grid, particles * x2 / (sum(x2) * grid.spacing))
         return d
 
+    def d_rho_d_x(x: np.ndarray) -> np.ndarray:
+        x2 = x ** 2
+        sum_x2 = sum(x2)
+        prefactor = 2 * particles / (grid.spacing * sum_x2)
+        return prefactor * (np.einsum("i,ik->ik", x, identity) - np.einsum("k,i->ik", x, x2) / sum_x2)
+
     def scipy_cost(x):
-        return functional(x_to_density(x))
+        return functional(rho_of_x(x))
+
+    def scipy_gradient(x):
+        return d_rho_d_x(x).T @ functional.functional_derivative(rho_of_x(x)).values
 
     width = (max(grid.values) - min(grid.values)) / 4.0
     guess = np.exp(-(grid.values / width) ** 2)
-    res = minimize(scipy_cost, guess)
+    res = minimize(scipy_cost, guess, jac=scipy_gradient)
 
-    return x_to_density(res.x), res.fun
+    return rho_of_x(res.x), res.fun

@@ -3,7 +3,7 @@ import numpy as np
 from functionals import *
 
 
-def test_gradient():
+def test_gradient_v_ext():
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = ExternalPotential(v)

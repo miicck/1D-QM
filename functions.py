@@ -103,7 +103,7 @@ class Density(Function):
     @property
     def particles(self) -> float:
         if self._particles is None:
-            self._particles = np.trapz(self.values, self.x.values)
+            self._particles = sum(self.values) * self.x.spacing
         return self._particles
 
     @particles.setter
