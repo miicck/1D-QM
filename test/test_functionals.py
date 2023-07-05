@@ -31,7 +31,7 @@ def test_gradient_vw():
                      message="df/drho fails against finite differences")
 
 
-def test_gradient_kelda(plot=True):
+def test_gradient_kelda(plot=False):
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = KELDA(v, 4)

@@ -100,7 +100,7 @@ def plot_densities(v: Potential,
         plt.annotate(rf"$N = {n}$", (min(d.x.values), max(d.values) / 10.0))
         plt.xlabel(r"$x$")
         plt.ylabel(r"$\rho(x)$")
-        plt.legend()
+        plt.legend(loc="upper right")
 
     plt.figure()
     for name in results:
@@ -124,15 +124,16 @@ def plot_harmonic_oscillator_densities(profile=False):
 
 
 def plot_triple_coulomb_well_densities():
-    v = Potential(Grid(-10, 10, 101))
-    v.values = -10 / (abs(v.x.values - 3) + 1) - 10 / (abs(v.x.values + 3) + 1) - 10 / (abs(v.x.values) + 1)
+    grid = Grid(-10, 10, 151)
 
-    v_double = Potential(Grid(-10, 10, 101))
-    v_double.values = -10 / (abs(v.x.values - 2) + 1) - 10 / (abs(v.x.values + 2) + 1)
+    v_triple = Potential(grid)
+    v_triple.values = -10 / (abs(v_triple.x.values - 3) + 1) - 10 / (abs(v_triple.x.values + 3) + 1) - 10 / (
+            abs(v_triple.x.values) + 1)
 
-    plot_densities(v, {
-        "KELDA": lambda info: KELDA(v, info["N"]),
-        "KELDA N = 10": lambda info: KELDA(v, 10, allow_n_mismatch=True),
+    v_double = Potential(grid)
+    v_double.values = -10 / (abs(v_triple.x.values - 2) + 1) - 10 / (abs(v_triple.x.values + 2) + 1)
+
+    plot_densities(v_triple, {
         "KELDA N = 10 v = double well": lambda info: KELDA(v_double, 10, allow_n_mismatch=True),
         "vW": lambda info: VonWeizakerKE()
     })
@@ -142,13 +143,11 @@ def plot_kelda_interpolations():
     grid = Grid(-10, 10, 101)
 
     potentials = {
-        "Harmonic well": Potential(
-            grid, 0.5 * grid.values ** 2),
-        "Coulomb well": Potential(
+        "Single well": Potential(
             grid, -10 / (abs(grid.values) + 1)),
-        "Double coulomb well": Potential(
+        "Double well": Potential(
             grid, -10 / (abs(grid.values - 2) + 1) - 10 / (abs(grid.values + 2) + 1)),
-        "Triple coulomb well": Potential(
+        "Triple well": Potential(
             grid, -10 / (abs(grid.values - 3) + 1) - 10 / (abs(grid.values + 3) + 1) - 10 / (abs(grid.values) + 1))
     }
 
@@ -156,17 +155,37 @@ def plot_kelda_interpolations():
 
     for i, n in enumerate(n_values):
         for j, v_name in enumerate(potentials):
-            plt.subplot(len(n_values), len(potentials), 1 + j + i * len(potentials))
+            plt.subplot(len(n_values) + 2, len(potentials), 1 + j + i * len(potentials))
 
             f = KELDA(potentials[v_name], n)
             interp_densities = np.linspace(0, max(f.reference_densities) * 1.1, 1000)
-            plt.plot(f.reference_densities, f.reference_kinetic_energy_densities)
-            plt.plot(interp_densities, f.t_lda(interp_densities), linestyle="dashed")
+            plt.plot(f.reference_densities, f.reference_kinetic_energy_densities, color="blue")
+            plt.plot(interp_densities, f.t_lda(interp_densities), linestyle="dashed", color="red")
+
+            plt.ylim([-5, 5])
+            plt.xticks([])
+            plt.yticks([])
 
             if i == len(n_values) - 1:
-                plt.xlabel(fr"$\rho$ ({v_name})")
+                plt.xlabel(fr"$\rho$")
+                plt.xticks([0, 0.5, 1, 1.5])
+
             if j == 0:
-                plt.ylabel(fr"$t(\rho)$ ($N$ = {n})")
+                plt.ylabel(fr"$t(\rho)$" + f"\nN = {n}")
+                plt.yticks([-2.0, 2.0])
+
+    for j, v_name in enumerate(potentials):
+
+        plt.subplot(len(n_values) + 2, len(potentials), 1 + j + (len(n_values) + 1) * len(potentials))
+        plt.plot(grid.values, potentials[v_name].values, color="black")
+        plt.xlabel(r"$x$" + f"\n{v_name}")
+
+        plt.ylim([-20, 0])
+        plt.xticks([])
+        plt.yticks([])
+
+        if j == 0:
+            plt.ylabel(fr"$v(x)$")
 
     plt.subplots_adjust(hspace=0, wspace=0)
     plt.show()
@@ -229,5 +248,5 @@ def plot_harmonic_ladder_operators():
 
 
 if __name__ == "__main__":
-    plot_kelda_interpolations()
+    #plot_kelda_interpolations()
     plot_triple_coulomb_well_densities()
