@@ -17,6 +17,20 @@ def test_gradient_v_ext():
         assert np.allclose(functional(dd), df_dro.inner_product(dd))
 
 
+def test_gradient_vw():
+    grid = Grid(-8, 8, 101)
+    v = Potential(grid, 0.5 * grid.values ** 2)
+    functional = VonWeizakerKE()
+    d = Density(v.x)
+    d.values = 1 + np.exp(-d.x.values ** 2)
+
+    df_drho = functional.functional_derivative(d)
+    df_drho_fd = functional.functional_derivative_finite_difference(d)
+
+    assert_all_close(df_drho.values[1:-2], df_drho_fd.values[1:-2], atol=0.01,
+                     message="df/drho fails against finite differences")
+
+
 def test_minimize():
     grid = Grid(-8, 8, 22)
     v = Potential(grid, 0.5 * grid.values ** 2)

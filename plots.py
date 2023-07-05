@@ -119,7 +119,7 @@ def plot_harmonic_oscillator_densities(profile=False):
     plot_densities(v, {
         "KELDA": lambda info: KELDA(v, info["N"]),
         "vW": lambda info: VonWeizakerKE(),
-        #"Ladder": lambda info: LadderKineticFunctional()
+        # "Ladder": lambda info: LadderKineticFunctional()
     }, show_plot=not profile, use_multiprocessing=not profile)
 
 

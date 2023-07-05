@@ -45,6 +45,12 @@ class VonWeizakerKE(DensityFunctional):
         sqrt = Density(density.x, density.values ** 0.5)
         return -0.5 * sqrt.inner_product(sqrt.laplacian)
 
+    def functional_derivative(self, density: Density) -> Function:
+        p = Density(density.x, density.values ** 0.5)
+        p1 = p.derivative
+        p2 = p1.derivative
+        return Function(density.x, -0.5 * p2.values / p.values)
+
 
 class ExternalPotential(DensityFunctional):
 
