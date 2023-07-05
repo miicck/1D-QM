@@ -31,6 +31,31 @@ def test_gradient_vw():
                      message="df/drho fails against finite differences")
 
 
+def test_gradient_kelda(plot=False):
+    grid = Grid(-8, 8, 101)
+    v = Potential(grid, 0.5 * grid.values ** 2)
+    functional = KELDA(v, 4)
+    d = Density(v.x, np.exp(-v.x.values ** 2))
+    d.particles = 4
+    df_drho = functional.functional_derivative(d)
+    df_drho_fd = functional.functional_derivative_finite_difference(d)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        drange = np.linspace(min(d.values), max(d.values), 10001)
+        plt.plot(drange, functional.t_lda(drange))
+        plt.plot(drange, functional.t_lda_derivative(drange))
+
+        plt.figure()
+        plt.plot(df_drho.values)
+        plt.plot(df_drho_fd.values)
+        plt.show()
+
+    assert_all_close(df_drho.values, df_drho_fd.values, atol=0.1,
+                     message="df/drho fails against finite differences")
+
+
 def test_minimize():
     grid = Grid(-8, 8, 22)
     v = Potential(grid, 0.5 * grid.values ** 2)

@@ -154,15 +154,15 @@ class KELDA(DensityFunctional):
         sv = np.array(sv).T
 
         # Build interpolation
-        scipy_interp = interp1d(sv[0], sv[1])
+        t_lda_interp = interp1d(sv[0], sv[1], kind="quadratic")
         d_min, d_max = min(sv[0]), max(sv[0])
 
         # Evaluate quantities needed for linear extrapolation
         eps = 1e-4
-        f_dmax = scipy_interp(d_max)
-        f_dmin = scipy_interp(d_min)
-        dfdx_dmax = (scipy_interp(d_max) - scipy_interp(d_max - eps)) / eps
-        dfdx_dmin = (scipy_interp(d_min + eps) - scipy_interp(d_min)) / eps
+        f_dmax = t_lda_interp(d_max)
+        f_dmin = t_lda_interp(d_min)
+        dfdx_dmax = (t_lda_interp(d_max) - t_lda_interp(d_max - eps)) / eps
+        dfdx_dmin = (t_lda_interp(d_min + eps) - t_lda_interp(d_min)) / eps
 
         def t_lda(density: np.ndarray):
 
@@ -170,7 +170,7 @@ class KELDA(DensityFunctional):
 
             # Generate in-range result using interpolator
             d_in_range = np.logical_and(density < d_max, density > d_min)
-            result[d_in_range] = scipy_interp(density[d_in_range])
+            result[d_in_range] = t_lda_interp(density[d_in_range])
 
             # Generate out-of-range results using linear extrapolation
             d_less = density <= d_min
@@ -182,10 +182,13 @@ class KELDA(DensityFunctional):
 
         self._t_lda = t_lda
 
-    def t_lda(self, density):
+    def t_lda(self, density: np.ndarray) -> np.ndarray:
         if self._t_lda is None:
             self.derive_lda()
         return self._t_lda(density)
+
+    def t_lda_derivative(self, density, eps=1e-6):
+        return (self.t_lda(density + eps) - self.t_lda(density)) / eps
 
     def v_eff(self, density: Density) -> Potential:
 
@@ -197,6 +200,11 @@ class KELDA(DensityFunctional):
 
     def apply(self, density: Density, plot=False) -> float:
         return density.inner_product(self.v_eff(density))
+
+    def functional_derivative(self, density: Density) -> Function:
+        return Function(density.x,
+                        self.v_eff(density).values +
+                        density.values * self.t_lda_derivative(density.values))
 
 
 class CombinedDensityFunctional(DensityFunctional):
