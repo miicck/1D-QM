@@ -44,7 +44,9 @@ def test_gradient_kelda(plot=False):
         import matplotlib.pyplot as plt
 
         drange = np.linspace(min(d.values), max(d.values), 10001)
+        plt.subplot(221)
         plt.plot(drange, functional.t_lda(drange))
+        plt.subplot(222)
         plt.plot(drange, functional.t_lda_derivative(drange))
 
         plt.figure()

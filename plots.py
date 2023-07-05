@@ -114,7 +114,7 @@ def plot_densities(v: Potential,
 
 
 def plot_harmonic_oscillator_densities(profile=False):
-    v = Potential(Grid(-8, 8, 51))
+    v = Potential(Grid(-8, 8, 71))
     v.values = 0.5 * v.x.values ** 2
     plot_densities(v, {
         "KELDA": lambda info: KELDA(v, info["N"]),

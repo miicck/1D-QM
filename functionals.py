@@ -154,7 +154,7 @@ class KELDA(DensityFunctional):
         sv = np.array(sv).T
 
         # Build interpolation
-        t_lda_interp = interp1d(sv[0], sv[1], kind="quadratic")
+        t_lda_interp = interp1d(sv[0], sv[1])
         d_min, d_max = min(sv[0]), max(sv[0])
 
         # Evaluate quantities needed for linear extrapolation
