@@ -31,7 +31,7 @@ def test_gradient_vw():
                      message="df/drho fails against finite differences")
 
 
-def test_gradient_kelda(plot=False):
+def test_gradient_kelda(plot=True):
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = KELDA(v, 4)
@@ -43,9 +43,15 @@ def test_gradient_kelda(plot=False):
     if plot:
         import matplotlib.pyplot as plt
 
-        drange = np.linspace(min(d.values), max(d.values), 10001)
+        dref = functional.reference_densities
+        kref = functional.reference_kinetic_energy_densities
+        drange = np.linspace(0, max(dref)*2, 1000)
+
         plt.subplot(221)
-        plt.plot(drange, functional.t_lda(drange))
+        plt.plot(drange, functional.t_lda(drange), label="Interpolation")
+        plt.plot(dref, kref, label="Reference data")
+        plt.legend()
+
         plt.subplot(222)
         plt.plot(drange, functional.t_lda_derivative(drange))
 

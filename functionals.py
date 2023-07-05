@@ -128,10 +128,12 @@ class LocalKEDensityFunctional(DensityFunctional):
 
 class KELDA(DensityFunctional):
 
-    def __init__(self, potential: Potential, particles: float):
+    def __init__(self, potential: Potential, particles: float, allow_n_mismatch: bool = False):
         self._potential = potential
         self._particles = particles
         self._t_lda = None
+        self._ref_data = None
+        self._allow_n_mismatch = allow_n_mismatch
 
     def derive_lda(self):
         from scipy.interpolate import interp1d
@@ -181,6 +183,19 @@ class KELDA(DensityFunctional):
             return result
 
         self._t_lda = t_lda
+        self._ref_data = [ref_density, ref_ke]
+
+    @property
+    def reference_densities(self) -> np.ndarray:
+        if self._ref_data is None:
+            self.derive_lda()
+        return self._ref_data[0].copy()
+
+    @property
+    def reference_kinetic_energy_densities(self) -> np.ndarray:
+        if self._ref_data is None:
+            self.derive_lda()
+        return self._ref_data[1].copy()
 
     def t_lda(self, density: np.ndarray) -> np.ndarray:
         if self._t_lda is None:
@@ -192,9 +207,10 @@ class KELDA(DensityFunctional):
 
     def v_eff(self, density: Density) -> Potential:
 
-        if abs(density.particles - self._particles) > 1e-5:
-            raise Exception(f"Tried to use KELDA derived for N = {self._particles} "
-                            f"on a density with N = {density.particles}")
+        if not self._allow_n_mismatch:
+            if abs(density.particles - self._particles) > 1e-5:
+                raise Exception(f"Tried to use KELDA derived for N = {self._particles} "
+                                f"on a density with N = {density.particles}")
 
         return Potential(density.x, self.t_lda(density.values))
 
