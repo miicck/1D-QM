@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 from multiprocessing import cpu_count, Pool
 from typing import Dict
-from functions import *
-from functionals import *
+from qm1d.functionals import *
 
 
 def plot_harmonic_oscillator_exact_density_t():
@@ -80,13 +79,13 @@ def plot_densities(v: Potential,
 
         if use_multiprocessing:
             with Pool(cpu_count()) as p:
-                results[name] = p.starmap(minimize_density_functional, args)
+                results[name] = p.starmap(minimize_density_functional_timed, args)
         else:
-            results[name] = [minimize_density_functional(*a) for a in args]
+            results[name] = [minimize_density_functional_timed(*a) for a in args]
 
     # Get exact results
     exact_results = [s.density(n) for n in n_values]
-    exact_results = [[d, v.inner_product(d) + s.kinetic_energy(n)] for n, d in zip(n_values, exact_results)]
+    exact_results = [[0, d, v.inner_product(d) + s.kinetic_energy(n)] for n, d in zip(n_values, exact_results)]
     results["Exact"] = exact_results
 
     for n in n_values:
@@ -94,7 +93,7 @@ def plot_densities(v: Potential,
 
         for name in results:
             # Plot density
-            d, e = results[name][n - 1]
+            t, d, e = results[name][n - 1]
             plt.plot(d.x.values, d.values, label=f"{name} (e = {e:.5f})")
 
         plt.annotate(rf"$N = {n}$", (min(d.x.values), max(d.values) / 10.0))
@@ -104,16 +103,23 @@ def plot_densities(v: Potential,
 
     plt.figure()
     for name in results:
-        plt.plot(n_values, [r[1] for r in results[name]], label=name)
+        plt.plot(n_values, [r[2] for r in results[name]], label=name)
     plt.xlabel(r"$N$")
     plt.ylabel(r"$E$")
+    plt.legend()
+
+    plt.figure()
+    for name in results:
+        plt.plot(n_values, [r[0] for r in results[name]], label=name)
+    plt.xlabel(r"$N$")
+    plt.ylabel(r"$Time$")
     plt.legend()
 
     if show_plot:
         plt.show()
 
 
-def plot_harmonic_oscillator_densities(profile=False):
+def plot_harmonic_oscillator_densities_kelda(profile=False):
     v = Potential(Grid(-8, 8, 101))
     v.values = 0.5 * v.x.values ** 2
     plot_densities(v, {
@@ -123,7 +129,17 @@ def plot_harmonic_oscillator_densities(profile=False):
     }, show_plot=not profile, use_multiprocessing=not profile)
 
 
-def plot_triple_coulomb_well_densities():
+def plot_harmonic_oscillator_densities_ladder(profile=False):
+    v = Potential(Grid(-8, 8, 51))
+    v.values = 0.5 * v.x.values ** 2
+    plot_densities(v, {
+        "TL1 (p=1)": lambda info: TL1(power=1),
+        # "Ladder": lambda info: LadderKineticFunctional(),
+        # "vW": lambda info: VonWeizakerKE()
+    }, show_plot=not profile, use_multiprocessing=not profile)
+
+
+def plot_triple_coulomb_well_densities_kelda():
     grid = Grid(-10, 10, 151)
 
     v_triple = Potential(grid)
@@ -248,5 +264,4 @@ def plot_harmonic_ladder_operators():
 
 
 if __name__ == "__main__":
-    #plot_kelda_interpolations()
-    plot_triple_coulomb_well_densities()
+    plot_harmonic_oscillator_densities_ladder()

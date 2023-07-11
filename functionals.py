@@ -1,4 +1,5 @@
 import math
+import time
 import numpy as np
 from functions import *
 from typing import Iterable
@@ -50,6 +51,49 @@ class VonWeizakerKE(DensityFunctional):
         p1 = p.derivative
         p2 = p1.derivative
         return Function(density.x, -0.5 * p2.values / p.values)
+
+
+class TL1(DensityFunctional):
+
+    def __init__(self, power: float = 1.0, precompute_derivatives=False):
+        self._power = power
+        self._precompute_derivatives = precompute_derivatives
+        self._derivatives = []
+
+    def apply(self, density: Density) -> float:
+
+        if self._precompute_derivatives:
+            return self.apply_precomputed(density)
+
+        result = 0.0
+
+        states = [Orbital(density.x, density.values ** self._power)]
+        states[0].normalize()
+
+        auf = OrbitalSpectrum.aufbau_weights(density.particles)
+        while len(states) < len(auf):
+            states.append(states[-1].derivative)
+            states[-1].normalize()
+
+        return -0.5 * sum(a * states[i].inner_product(states[i].laplacian) for i, a in enumerate(auf))
+
+    def apply_precomputed(self, density: Density) -> float:
+
+        auf = OrbitalSpectrum.aufbau_weights(density.particles)
+
+        if len(self._derivatives) == 0:
+            self._derivatives = [np.identity(len(density.x.values))]
+
+        while len(self._derivatives) < len(auf):
+            self._derivatives.append(density.x.gradient @ self._derivatives[-1])
+
+        total = 0.0
+        for i, a in enumerate(auf):
+            state = Orbital(density.x, self._derivatives[i] @ (density.values ** self._power))
+            state.normalize()
+            total += state.inner_product(state.laplacian)
+
+        return -0.5 * total
 
 
 class ExternalPotential(DensityFunctional):
@@ -237,6 +281,12 @@ class CombinedDensityFunctional(DensityFunctional):
         vals = sum(w * f.functional_derivative(density).values
                    for w, f in zip(self._weights, self._functionals))
         return Function(density.x, vals)
+
+
+def minimize_density_functional_timed(*args, **kwargs):
+    time_start = time.time()
+    results = minimize_density_functional(*args, **kwargs)
+    return time.time() - time_start, *results
 
 
 def minimize_density_functional(

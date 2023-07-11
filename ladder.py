@@ -96,7 +96,7 @@ class PotentialBiasedGroundState(DensityToGroundStateMap):
         self._v_power = v_power
         self._d_power = d_power
         self._v_mix = v_mix
-        self._v_orbital =v.diagonalize_hamiltonian().orbitals[0]
+        self._v_orbital = v.diagonalize_hamiltonian().orbitals[0]
 
     def apply(self, denisty: Density) -> Orbital:
         d_orbital = Orbital(denisty.x, denisty.values ** self._d_power).normalized
