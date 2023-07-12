@@ -26,3 +26,11 @@ def test_copy():
     assert Tensor.allclose(t, t2)
     t2[0, 0] += 1
     assert not Tensor.allclose(t, t2)
+
+
+def test_torch_convert():
+    import numpy as np
+    t = Tensor.linspace(0, 1, 101)
+    print(t.device)
+    t2 = Tensor.asarray(np.linspace(0, 1, 101))
+    print(t2.device)

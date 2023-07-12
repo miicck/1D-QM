@@ -1,9 +1,25 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, Any, Tuple
 import numpy as _np
+import numpy as np
 import torch
 
+TORCH_DEVICE = "cpu"
+
 torch.set_default_dtype(torch.float64)
+torch.set_default_device(TORCH_DEVICE)
+
+
+class _AbstractTensor:
+
+    @classmethod
+    @abstractmethod
+    def from_numpy(cls, numpy_array) -> '_AbstractTensor':
+        raise NotImplementedError
+
+    @classmethod
+    def from_values(cls, values):
+        return cls.from_numpy(np.array(values))
 
 
 def _getattr_replace_super_wtih_sub_(obj, item, super, sub, super_to_sub):
@@ -32,8 +48,10 @@ class _NumpyTensorMeta(type(_np.ndarray)):
             _np, item, _np.ndarray, _NumpyTensor, lambda x: x.view(_NumpyTensor))
 
 
-class _NumpyTensor(_np.ndarray, metaclass=_NumpyTensorMeta):
-    pass
+class _NumpyTensor(_np.ndarray, _AbstractTensor, metaclass=_NumpyTensorMeta):
+
+    def from_numpy(cls, numpy_array) -> '_AbstractTensor':
+        return numpy_array.view(_NumpyTensor)
 
 
 class _TorchTensorMeta(type(torch.Tensor)):
@@ -55,10 +73,10 @@ class _TorchTensorMeta(type(torch.Tensor)):
             torch, item, torch.Tensor, _TorchTensor, super_to_sub)
 
 
-class _TorchTensor(torch.Tensor, metaclass=_TorchTensorMeta):
+class _TorchTensor(torch.Tensor, _AbstractTensor, metaclass=_TorchTensorMeta):
 
     def copy(self) -> '_TorchTensor':
-        return self.clone()
+        return self.clone().detach()
 
     def __str__(self):
         if len(self.shape) == 0:
@@ -70,5 +88,18 @@ class _TorchTensor(torch.Tensor, metaclass=_TorchTensorMeta):
             return self.item().__format__(format_spec)
         return super(_TorchTensor, self).__format__(format_spec)
 
+    def __array__(self, dtype=None):
+        return self.cpu().numpy()
 
-Tensor = _TorchTensor
+    @classmethod
+    def from_numpy(cls, numpy_array) -> '_AbstractTensor':
+        result = torch.from_numpy(numpy_array).to(torch.device(TORCH_DEVICE))
+        result.__class__ = _TorchTensor
+        return result
+
+    @classmethod
+    def asarray(cls, values):
+        return cls.from_values(values)
+
+
+Tensor = _NumpyTensor

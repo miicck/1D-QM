@@ -198,7 +198,7 @@ class KELDA(DensityFunctional):
             if ref_density[i] > sv[-1][0]:
                 sv.append((ref_density[i], ref_ke[i]))
 
-        sv = Tensor.asarray(sv).T
+        sv = Tensor.from_values(sv).T
 
         # Build interpolation
         t_lda_interp = interp1d(sv[0], sv[1])
@@ -217,7 +217,7 @@ class KELDA(DensityFunctional):
 
             # Generate in-range result using interpolator
             d_in_range = Tensor.logical_and(density < d_max, density > d_min)
-            result[d_in_range] = t_lda_interp(density[d_in_range])
+            result[d_in_range] = Tensor.asarray(t_lda_interp(density[d_in_range]))
 
             # Generate out-of-range results using linear extrapolation
             d_less = density <= d_min
@@ -310,13 +310,15 @@ def minimize_density_functional(
         return prefactor * (Tensor.einsum("i,ik->ik", x, identity) - Tensor.einsum("k,i->ik", x, x2) / sum_x2)
 
     def scipy_cost(x):
+        x = Tensor.asarray(x)
         return functional(rho_of_x(x))
 
     def scipy_gradient(x):
+        x = Tensor.asarray(x)
         return d_rho_d_x(x).T @ functional.functional_derivative(rho_of_x(x)).values
 
     width = (max(grid.values) - min(grid.values)) / 4.0
     guess = Tensor.exp(-(grid.values / width) ** 2)
     res = minimize(scipy_cost, guess, jac=scipy_gradient)
 
-    return rho_of_x(res.x), res.fun
+    return rho_of_x(Tensor.asarray(res.x)), res.fun

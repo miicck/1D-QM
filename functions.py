@@ -132,7 +132,7 @@ class Density(Function):
                 return v
 
             v.values += delta_density * 0.5
-            v.values -= min(v.values)
+            v.values -= float(min(v.values))
 
             if callback is not None:
                 callback(v, eig, self, eig_d)

@@ -70,7 +70,7 @@ def test_minimize():
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()])
     density, energy = minimize_density_functional(4, grid, functional)
-    assert Tensor.allclose(density.particles, 4)
+    assert abs(density.particles - 4) < 1e-8
 
 
 def test_kelda(plot=False):

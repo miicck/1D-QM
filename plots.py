@@ -207,7 +207,7 @@ def plot_kelda_interpolations():
     plt.show()
 
 
-def plot_ladder_operators(v: Potential, ladder: LadderOperator):
+def plot_ladder_operators(v: Potential, ladder: LadderOperator, show=True):
     spectrum = v.diagonalize_hamiltonian()
 
     # Evaluate exact ladder operator from sum of projection operators
@@ -254,14 +254,15 @@ def plot_ladder_operators(v: Potential, ladder: LadderOperator):
         plt.plot(v.x.values, proj @ spectrum.orbitals[i - 1].values)
 
     plt.subplots_adjust(hspace=0.0)
-    plt.show()
+    if show:
+        plt.show()
 
 
-def plot_harmonic_ladder_operators():
+def plot_harmonic_ladder_operators(profile=False):
     v = Potential(Grid(-8, 8, 51))
     v.values = 0.5 * v.x.values ** 2
-    plot_ladder_operators(v, DerivativeLadderOperator())
+    plot_ladder_operators(v, DerivativeLadderOperator(), show=not profile)
 
 
 if __name__ == "__main__":
-    plot_harmonic_oscillator_densities_ladder()
+    plot_harmonic_ladder_operators()
