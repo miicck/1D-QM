@@ -3,6 +3,8 @@ from typing import Iterable, Any, Tuple
 import numpy as _np
 import torch
 
+torch.set_default_dtype(torch.float64)
+
 
 def _getattr_replace_super_wtih_sub_(obj, item, super, sub, super_to_sub):
     to_wrap = getattr(obj, item)
@@ -57,6 +59,16 @@ class _TorchTensor(torch.Tensor, metaclass=_TorchTensorMeta):
 
     def copy(self) -> '_TorchTensor':
         return self.clone()
+
+    def __str__(self):
+        if len(self.shape) == 0:
+            return str(self.item())
+        return super(_TorchTensor, self).__str__()
+
+    def __format__(self, format_spec):
+        if len(self.shape) == 0:
+            return self.item().__format__(format_spec)
+        return super(_TorchTensor, self).__format__(format_spec)
 
 
 Tensor = _TorchTensor
