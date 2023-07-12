@@ -1,16 +1,17 @@
-import numpy as np
 from abc import ABC, abstractmethod
+from typing import Union
+from qm1d.tensor import Tensor
 
 
 class Grid:
 
     def __init__(self, minimum: float, maximum: float, points: int):
-        self._values = np.linspace(minimum, maximum, points)
+        self._values = Tensor.linspace(minimum, maximum, points)
         self._laplacian = None
         self._gradient = None
 
     @property
-    def values(self) -> np.ndarray:
+    def values(self) -> Tensor:
         return self._values
 
     @property
@@ -22,9 +23,9 @@ class Grid:
         return len(self.values)
 
     @property
-    def laplacian(self) -> np.ndarray:
+    def laplacian(self) -> Tensor:
         if self._laplacian is None:
-            self._laplacian = np.zeros((self.points, self.points))
+            self._laplacian = Tensor.zeros((self.points, self.points))
 
             for i in range(self.points):
                 self._laplacian[i, i] = -2.0
@@ -40,9 +41,9 @@ class Grid:
         return self._laplacian
 
     @property
-    def gradient(self) -> np.ndarray:
+    def gradient(self) -> Tensor:
         if self._gradient is None:
-            self._gradient = np.zeros((self.points, self.points))
+            self._gradient = Tensor.zeros((self.points, self.points))
 
             for i in range(1, self.points - 1):
                 self._gradient[i, i - 1] = -0.5
@@ -54,16 +55,16 @@ class Grid:
 
 class Function:
 
-    def __init__(self, grid: Grid, values: np.ndarray = None):
+    def __init__(self, grid: Grid, values: Tensor = None):
 
         self._grid = grid
 
         if values is not None:
-            values = np.array(values)
+            values = values.copy()
             assert values.shape == grid.values.shape, \
                 f"Values shape = {values.shape} != grid shape = {grid.values.shape}"
         else:
-            values = np.zeros(grid.values.shape)
+            values = Tensor.zeros(grid.values.shape)
 
         self.values = values
 
@@ -72,11 +73,11 @@ class Function:
         return self._grid
 
     @property
-    def values(self) -> np.ndarray:
+    def values(self) -> Tensor:
         return self._values
 
     @values.setter
-    def values(self, val: np.ndarray):
+    def values(self, val: Tensor):
         self._values = val
         self._norm = None
         self.on_values_change()
@@ -90,9 +91,7 @@ class Function:
 
     @property
     def laplacian(self) -> 'Function':
-        lapf = Function(self.x)
-        lapf.values = self.x.laplacian @ self.values
-        return lapf
+        return Function(self.x, self.x.laplacian @ self.values)
 
     @property
     def norm(self) -> float:
@@ -112,8 +111,8 @@ class Function:
     def inner_product(self, other: 'Function') -> float:
         return sum(self.values * other.values) * self.x.spacing
 
-    def outer_product(self, other: 'Function') -> np.ndarray:
-        return np.outer(self.values, other.values)
+    def outer_product(self, other: 'Function') -> Tensor:
+        return Tensor.outer(self.values, other.values)
 
     def plot(self, blocking=True):
         import matplotlib.pyplot as plt

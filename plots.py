@@ -130,7 +130,7 @@ def plot_harmonic_oscillator_densities_kelda(profile=False):
 
 
 def plot_harmonic_oscillator_densities_ladder(profile=False):
-    v = Potential(Grid(-8, 8, 51))
+    v = Potential(Grid(-8, 8, 31))
     v.values = 0.5 * v.x.values ** 2
     plot_densities(v, {
         "TL1 (p=1)": lambda info: TL1(power=1),
@@ -174,7 +174,7 @@ def plot_kelda_interpolations():
             plt.subplot(len(n_values) + 2, len(potentials), 1 + j + i * len(potentials))
 
             f = KELDA(potentials[v_name], n)
-            interp_densities = np.linspace(0, max(f.reference_densities) * 1.1, 1000)
+            interp_densities = Tensor.linspace(0, max(f.reference_densities) * 1.1, 1000)
             plt.plot(f.reference_densities, f.reference_kinetic_energy_densities, color="blue")
             plt.plot(interp_densities, f.t_lda(interp_densities), linestyle="dashed", color="red")
 

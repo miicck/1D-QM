@@ -1,6 +1,6 @@
 import math
 import time
-import numpy as np
+from qm1d.tensor import Tensor
 from functions import *
 from typing import Iterable
 from ladder import *
@@ -17,14 +17,14 @@ class DensityFunctional(ABC):
 
     def functional_derivative_finite_difference(self, density: Density, eps=1e-6) -> Function:
         # Will contain the gradient
-        result = np.zeros(density.x.values.shape)
+        result = Tensor.zeros(density.x.values.shape)
 
         # Get center value
         f0 = self.apply(density)
 
         for i in range(len(result)):
             # Perturb the density
-            x_before = density.values[i]
+            x_before = float(density.values[i])
             density.values[i] += eps
             x_after = density.values[i]
 
@@ -82,7 +82,7 @@ class TL1(DensityFunctional):
         auf = OrbitalSpectrum.aufbau_weights(density.particles)
 
         if len(self._derivatives) == 0:
-            self._derivatives = [np.identity(len(density.x.values))]
+            self._derivatives = [Tensor.identity(len(density.x.values))]
 
         while len(self._derivatives) < len(auf):
             self._derivatives.append(density.x.gradient @ self._derivatives[-1])
@@ -197,7 +197,8 @@ class KELDA(DensityFunctional):
         for i in range(len(ref_density)):
             if ref_density[i] > sv[-1][0]:
                 sv.append((ref_density[i], ref_ke[i]))
-        sv = np.array(sv).T
+
+        sv = Tensor.asarray(sv).T
 
         # Build interpolation
         t_lda_interp = interp1d(sv[0], sv[1])
@@ -210,12 +211,12 @@ class KELDA(DensityFunctional):
         dfdx_dmax = (t_lda_interp(d_max) - t_lda_interp(d_max - eps)) / eps
         dfdx_dmin = (t_lda_interp(d_min + eps) - t_lda_interp(d_min)) / eps
 
-        def t_lda(density: np.ndarray):
+        def t_lda(density: Tensor):
 
-            result = np.zeros(density.shape)
+            result = Tensor.zeros(density.shape)
 
             # Generate in-range result using interpolator
-            d_in_range = np.logical_and(density < d_max, density > d_min)
+            d_in_range = Tensor.logical_and(density < d_max, density > d_min)
             result[d_in_range] = t_lda_interp(density[d_in_range])
 
             # Generate out-of-range results using linear extrapolation
@@ -230,18 +231,18 @@ class KELDA(DensityFunctional):
         self._ref_data = [ref_density, ref_ke]
 
     @property
-    def reference_densities(self) -> np.ndarray:
+    def reference_densities(self) -> Tensor:
         if self._ref_data is None:
             self.derive_lda()
         return self._ref_data[0].copy()
 
     @property
-    def reference_kinetic_energy_densities(self) -> np.ndarray:
+    def reference_kinetic_energy_densities(self) -> Tensor:
         if self._ref_data is None:
             self.derive_lda()
         return self._ref_data[1].copy()
 
-    def t_lda(self, density: np.ndarray) -> np.ndarray:
+    def t_lda(self, density: Tensor) -> Tensor:
         if self._t_lda is None:
             self.derive_lda()
         return self._t_lda(density)
@@ -271,7 +272,7 @@ class CombinedDensityFunctional(DensityFunctional):
 
     def __init__(self, functionals: Iterable[DensityFunctional], weights: Iterable[float] = None):
         self._functionals = list(functionals)
-        self._weights = np.ones(len(self._functionals)) if weights is None else list(weights)
+        self._weights = Tensor.ones(len(self._functionals)) if weights is None else list(weights)
 
     def apply(self, density: Density) -> float:
         return sum(w * f(density)
@@ -295,18 +296,18 @@ def minimize_density_functional(
         functional: DensityFunctional) -> Density:
     from scipy.optimize import minimize
 
-    identity = np.identity(len(grid.values))
+    identity = Tensor.identity(len(grid.values))
 
-    def rho_of_x(x: np.ndarray) -> Density:
+    def rho_of_x(x: Tensor) -> Density:
         x2 = x ** 2
         d = Density(grid, particles * x2 / (sum(x2) * grid.spacing))
         return d
 
-    def d_rho_d_x(x: np.ndarray) -> np.ndarray:
+    def d_rho_d_x(x: Tensor) -> Tensor:
         x2 = x ** 2
         sum_x2 = sum(x2)
         prefactor = 2 * particles / (grid.spacing * sum_x2)
-        return prefactor * (np.einsum("i,ik->ik", x, identity) - np.einsum("k,i->ik", x, x2) / sum_x2)
+        return prefactor * (Tensor.einsum("i,ik->ik", x, identity) - Tensor.einsum("k,i->ik", x, x2) / sum_x2)
 
     def scipy_cost(x):
         return functional(rho_of_x(x))
@@ -315,7 +316,7 @@ def minimize_density_functional(
         return d_rho_d_x(x).T @ functional.functional_derivative(rho_of_x(x)).values
 
     width = (max(grid.values) - min(grid.values)) / 4.0
-    guess = np.exp(-(grid.values / width) ** 2)
+    guess = Tensor.exp(-(grid.values / width) ** 2)
     res = minimize(scipy_cost, guess, jac=scipy_gradient)
 
     return rho_of_x(res.x), res.fun

@@ -1,4 +1,3 @@
-import numpy as np
 from hilbert import *
 from functions import *
 
@@ -9,16 +8,16 @@ class LadderOperator(ABC):
     def apply(self, orbital: Orbital, density: Density) -> Orbital:
         raise NotImplementedError()
 
-    def matrix_elements(self, grid: Grid, density: Density) -> np.ndarray:
+    def matrix_elements(self, grid: Grid, density: Density) -> Tensor:
 
-        matrix = np.zeros((grid.points, grid.points))
+        matrix = Tensor.zeros((grid.points, grid.points))
         for i in range(grid.points):
-            xi = np.zeros(grid.points)
+            xi = Tensor.zeros(grid.points)
             xi[i] = 1.0
             xi = Orbital(grid, xi)
             xi.normalize()
             for j in range(grid.points):
-                xj = np.zeros(grid.points)
+                xj = Tensor.zeros(grid.points)
                 xj[j] = 1.0
                 xj = Orbital(grid, xj)
                 xj.normalize()
@@ -69,7 +68,7 @@ class PotentialDerivativeLadder(LadderOperator):
 class DensityDerivativeLadder(LadderOperator):
 
     def apply(self, orbital: Orbital, density: Density) -> Orbital:
-        density_part = np.zeros(orbital.x.values.shape)
+        density_part = Tensor.zeros(orbital.x.values.shape)
         if density is not None:
             density_part = 0.5 * density.normalized.derivative.values * orbital.values
 

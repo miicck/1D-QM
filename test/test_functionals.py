@@ -1,20 +1,21 @@
 import matplotlib.pyplot as plt
-import numpy as np
 from functionals import *
 
 
 def test_gradient_v_ext():
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
-    functional = ExternalPotential(v)
     d = Density(v.x)
-    df_dro = functional.functional_derivative_finite_difference(d)
 
-    assert np.allclose(df_dro.values, functional.functional_derivative(d).values)
+    functional = ExternalPotential(v)
+    df_dro = functional.functional_derivative_finite_difference(d)
+    df_drho_fd = functional.functional_derivative_finite_difference(d)
+
+    assert Tensor.allclose(df_dro.values, df_drho_fd.values)
 
     for n in range(100):
-        dd = Density(v.x, np.random.random(d.values.shape) * 1e-6)
-        assert np.allclose(functional(dd), df_dro.inner_product(dd))
+        dd = Density(v.x, Tensor.random.random(d.values.shape) * 1e-6)
+        assert Tensor.allclose(functional(dd), df_dro.inner_product(dd))
 
 
 def test_gradient_vw():
@@ -22,7 +23,7 @@ def test_gradient_vw():
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = VonWeizakerKE()
     d = Density(v.x)
-    d.values = 1 + np.exp(-d.x.values ** 2)
+    d.values = 1 + Tensor.exp(-d.x.values ** 2)
 
     df_drho = functional.functional_derivative(d)
     df_drho_fd = functional.functional_derivative_finite_difference(d)
@@ -35,7 +36,7 @@ def test_gradient_kelda(plot=False):
     grid = Grid(-8, 8, 101)
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = KELDA(v, 4)
-    d = Density(v.x, np.exp(-v.x.values ** 2))
+    d = Density(v.x, Tensor.exp(-v.x.values ** 2))
     d.particles = 4
     df_drho = functional.functional_derivative(d)
     df_drho_fd = functional.functional_derivative_finite_difference(d)
@@ -45,7 +46,7 @@ def test_gradient_kelda(plot=False):
 
         dref = functional.reference_densities
         kref = functional.reference_kinetic_energy_densities
-        drange = np.linspace(0, max(dref)*2, 1000)
+        drange = Tensor.linspace(0, max(dref) * 2, 1000)
 
         plt.subplot(221)
         plt.plot(drange, functional.t_lda(drange), label="Interpolation")
@@ -69,7 +70,7 @@ def test_minimize():
     v = Potential(grid, 0.5 * grid.values ** 2)
     functional = CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()])
     density, energy = minimize_density_functional(4, grid, functional)
-    assert np.allclose(density.particles, 4)
+    assert Tensor.allclose(density.particles, 4)
 
 
 def test_kelda(plot=False):
@@ -104,7 +105,7 @@ def test_kelda(plot=False):
                 ke_dens = spectrum.kinetic_energy_density(n)
                 kelda.apply(rho)
 
-                x = np.linspace(min(rho.values), max(rho.values), 1000)
+                x = Tensor.linspace(min(rho.values), max(rho.values), 1000)
 
                 plt.plot(x, kelda.t_lda(x), color=(f, 1 - f, 0), linestyle=":")
                 plt.plot(rho.values, ke_dens.values, color=(f, 1 - f, 0))

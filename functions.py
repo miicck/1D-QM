@@ -1,5 +1,5 @@
 import math
-import numpy as np
+from qm1d.tensor import Tensor
 from qm1d.hilbert import *
 from qm1d.utils import assert_all_close
 from typing import List, Tuple, Callable, Iterable
@@ -62,19 +62,19 @@ class OrbitalSpectrum:
                        sum(a * self.orbitals[i].values ** 2 for i, a in enumerate(auf)))
 
     @staticmethod
-    def aufbau_weights(particles: float) -> np.ndarray:
+    def aufbau_weights(particles: float) -> Tensor:
         n_filled = math.floor(particles)
         result = [1.0] * n_filled + [particles - n_filled]
         result = [r for r in result if r > 1e-10]
-        return np.array(result)
+        return Tensor.asarray(result)
 
 
 class Potential(Function):
 
     def diagonalize_hamiltonian(self) -> OrbitalSpectrum:
         # Evaluate the hamiltonian
-        h = -0.5 * self.x.laplacian + np.diag(self.values)
-        eigenvalues, eigenvectors = np.linalg.eigh(h)
+        h = -0.5 * self.x.laplacian + Tensor.diag(self.values)
+        eigenvalues, eigenvectors = Tensor.linalg.eigh(h)
 
         orbitals = []
         for i in range(self.x.points):
@@ -84,7 +84,7 @@ class Potential(Function):
             # Ensure consistent sign of orbitals
             for j in range(len(vals_i)):
                 if abs(vals_i[j]) > 0.0001:
-                    vals_i *= np.sign(vals_i[j])
+                    vals_i *= Tensor.sign(vals_i[j])
                     break
 
             orb_i = Orbital(self.x)
