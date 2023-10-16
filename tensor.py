@@ -2,12 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Iterable, Any, Tuple
 import numpy as _np
 import numpy as np
-import torch
-
-TORCH_DEVICE = "cpu"
-
-torch.set_default_dtype(torch.float64)
-torch.set_default_device(TORCH_DEVICE)
 
 
 class _AbstractTensor:
@@ -19,7 +13,7 @@ class _AbstractTensor:
 
     @classmethod
     def from_values(cls, values):
-        return cls.from_numpy(np.array(values))
+        return cls.from_numpy(cls, np.array(values))
 
 
 def _getattr_replace_super_wtih_sub_(obj, item, super, sub, super_to_sub):
@@ -54,52 +48,63 @@ class _NumpyTensor(_np.ndarray, _AbstractTensor, metaclass=_NumpyTensorMeta):
         return numpy_array.view(_NumpyTensor)
 
 
-class _TorchTensorMeta(type(torch.Tensor)):
+try:
+    import torch
 
-    def __getattr__(self, item):
+    TORCH_DEVICE = "cpu"
 
-        # Match numpy API
-        if item == "random":
-            torch.random.random = torch.rand
-
-        if item == "identity":
-            torch.identity = torch.eye
-
-        def super_to_sub(sup):
-            sup.__class__ = _TorchTensor
-            return sup
-
-        return _getattr_replace_super_wtih_sub_(
-            torch, item, torch.Tensor, _TorchTensor, super_to_sub)
+    torch.set_default_dtype(torch.float64)
+    torch.set_default_device(TORCH_DEVICE)
 
 
-class _TorchTensor(torch.Tensor, _AbstractTensor, metaclass=_TorchTensorMeta):
+    class _TorchTensorMeta(type(torch.Tensor)):
 
-    def copy(self) -> '_TorchTensor':
-        return self.clone().detach()
+        def __getattr__(self, item):
 
-    def __str__(self):
-        if len(self.shape) == 0:
-            return str(self.item())
-        return super(_TorchTensor, self).__str__()
+            # Match numpy API
+            if item == "random":
+                torch.random.random = torch.rand
 
-    def __format__(self, format_spec):
-        if len(self.shape) == 0:
-            return self.item().__format__(format_spec)
-        return super(_TorchTensor, self).__format__(format_spec)
+            if item == "identity":
+                torch.identity = torch.eye
 
-    def __array__(self, dtype=None):
-        return self.cpu().numpy()
+            def super_to_sub(sup):
+                sup.__class__ = _TorchTensor
+                return sup
 
-    @classmethod
-    def from_numpy(cls, numpy_array) -> '_AbstractTensor':
-        result = torch.from_numpy(numpy_array).to(torch.device(TORCH_DEVICE))
-        result.__class__ = _TorchTensor
-        return result
+            return _getattr_replace_super_wtih_sub_(
+                torch, item, torch.Tensor, _TorchTensor, super_to_sub)
 
-    @classmethod
-    def asarray(cls, values):
-        return cls.from_values(values)
 
+    class _TorchTensor(torch.Tensor, _AbstractTensor, metaclass=_TorchTensorMeta):
+
+        def copy(self) -> '_TorchTensor':
+            return self.clone().detach()
+
+        def __str__(self):
+            if len(self.shape) == 0:
+                return str(self.item())
+            return super(_TorchTensor, self).__str__()
+
+        def __format__(self, format_spec):
+            if len(self.shape) == 0:
+                return self.item().__format__(format_spec)
+            return super(_TorchTensor, self).__format__(format_spec)
+
+        def __array__(self, dtype=None):
+            return self.cpu().numpy()
+
+        @classmethod
+        def from_numpy(cls, numpy_array) -> '_AbstractTensor':
+            result = torch.from_numpy(numpy_array).to(torch.device(TORCH_DEVICE))
+            result.__class__ = _TorchTensor
+            return result
+
+        @classmethod
+        def asarray(cls, values):
+            return cls.from_values(values)
+
+except ImportError:
+    Tensor = _NumpyTensor
 
 Tensor = _NumpyTensor

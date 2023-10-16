@@ -1,4 +1,6 @@
 import math
+
+import numpy as np
 from qm1d.tensor import Tensor
 from qm1d.hilbert import *
 from qm1d.utils import assert_all_close
@@ -110,6 +112,21 @@ class Density(Function):
     def particles(self, val: float):
         self.values *= val / self.particles
         assert abs(self.particles - val) < 1e-6
+
+    @property
+    def tf_kinetic_energy_density(self) -> Tensor:
+        c1 = (np.pi ** 2) / 24
+        return c1 * (self.values ** 2)
+
+    @property
+    def vw_kinetic_energy_density(self) -> Tensor:
+        g = self.derivative
+        return g.values ** 2 / (8 * self.values ** 2)
+
+    @property
+    def vw_lap_kinetic_energy_density(self) -> Tensor:
+        sqrt = Function(self.x, self.values ** 0.5)
+        return -0.5 * sqrt.values * sqrt.laplacian.values / self.values
 
     def calculate_potential(self, n_elec_tol: float = 0.01,
                             callback: Callable[[Potential, OrbitalSpectrum, 'Density', 'Density'], None] = None,

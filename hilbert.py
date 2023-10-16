@@ -111,6 +111,9 @@ class Function:
     def inner_product(self, other: 'Function') -> float:
         return sum(self.values * other.values) * self.x.spacing
 
+    def integrate(self) -> float:
+        return sum(self.values) * self.x.spacing
+
     def outer_product(self, other: 'Function') -> Tensor:
         return Tensor.outer(self.values, other.values)
 

@@ -1,5 +1,7 @@
 import math
 import time
+
+import numpy as np
 from qm1d.tensor import Tensor
 from functions import *
 from typing import Iterable
@@ -51,6 +53,20 @@ class VonWeizakerKE(DensityFunctional):
         p1 = p.derivative
         p2 = p1.derivative
         return Function(density.x, -0.5 * p2.values / p.values)
+
+
+class ThomasFermiKE(DensityFunctional):
+
+    @staticmethod
+    def prefactor() -> float:
+        return (math.pi ** 2) / 24
+
+    def apply(self, density: Density) -> float:
+        t = Function(density.x, density.values ** 2)
+        return ThomasFermiKE.prefactor() * density.inner_product(t)
+
+    def functional_derivative(self, density: Density) -> Function:
+        return Function(density.x, 3 * ThomasFermiKE.prefactor() * density.values ** 2)
 
 
 class TL1(DensityFunctional):
@@ -170,16 +186,21 @@ class LocalKEDensityFunctional(DensityFunctional):
         return self._ke_density.inner_product(density)
 
 
+def get_single_valued(x: Tensor, y: Tensor) -> Tensor:
+    sv = [[x[0], y[0]]]
+    for i in range(len(x)):
+        if x[i] > sv[-1][0]:
+            sv.append([x[i], y[i]])
+    return Tensor.from_values(sv).T
+
+
 class KELDA(DensityFunctional):
 
-    def __init__(self, potential: Potential, particles: float, allow_n_mismatch: bool = False):
+    def __init__(self, potential: Potential, particles: float, allow_n_mismatch: bool = False, plot: bool = False):
         self._potential = potential
         self._particles = particles
-        self._t_lda = None
-        self._ref_data = None
         self._allow_n_mismatch = allow_n_mismatch
 
-    def derive_lda(self):
         from scipy.interpolate import interp1d
         from scipy.optimize import curve_fit
 
@@ -191,14 +212,7 @@ class KELDA(DensityFunctional):
         i_keep = ref_density > 1e-5
         ref_density = ref_density[i_keep]
         ref_ke = ref_ke[i_keep]
-
-        # Get single-valued version of data
-        sv = [(ref_density[0], ref_ke[0])]
-        for i in range(len(ref_density)):
-            if ref_density[i] > sv[-1][0]:
-                sv.append((ref_density[i], ref_ke[i]))
-
-        sv = Tensor.from_values(sv).T
+        sv = get_single_valued(ref_density, ref_ke)
 
         # Build interpolation
         t_lda_interp = interp1d(sv[0], sv[1])
@@ -212,7 +226,6 @@ class KELDA(DensityFunctional):
         dfdx_dmin = (t_lda_interp(d_min + eps) - t_lda_interp(d_min)) / eps
 
         def t_lda(density: Tensor):
-
             result = Tensor.zeros(density.shape)
 
             # Generate in-range result using interpolator
@@ -230,21 +243,22 @@ class KELDA(DensityFunctional):
         self._t_lda = t_lda
         self._ref_data = [ref_density, ref_ke]
 
+        if plot:
+            import matplotlib.pyplot as plt
+            plt.plot(ref_density, ref_ke)
+            r_new = np.linspace(0, max(ref_density) * 1.1, 10001)
+            plt.plot(r_new, self._t_lda(r_new), linestyle=":")
+            plt.show()
+
     @property
     def reference_densities(self) -> Tensor:
-        if self._ref_data is None:
-            self.derive_lda()
         return self._ref_data[0].copy()
 
     @property
     def reference_kinetic_energy_densities(self) -> Tensor:
-        if self._ref_data is None:
-            self.derive_lda()
         return self._ref_data[1].copy()
 
     def t_lda(self, density: Tensor) -> Tensor:
-        if self._t_lda is None:
-            self.derive_lda()
         return self._t_lda(density)
 
     def t_lda_derivative(self, density, eps=1e-6):
@@ -266,6 +280,85 @@ class KELDA(DensityFunctional):
         return Function(density.x,
                         self.v_eff(density).values +
                         density.values * self.t_lda_derivative(density.values))
+
+
+class KELDA_NEW(DensityFunctional):
+
+    def __init__(self, potential: Potential, particles: float, plot: bool = False):
+        from scipy.interpolate import interp1d
+        self._potential = potential
+        self._particles = particles
+        s = potential.diagonalize_hamiltonian()
+
+        rho = s.density(particles).values
+        t = s.kinetic_energy_density(particles).values
+
+        i_keep = rho > 1e-5
+        rho = rho[i_keep]
+        t = t[i_keep]
+
+        rho, t = get_single_valued(rho, t)
+
+        self._t_interp = interp1d(rho, t, fill_value="extrapolate", bounds_error=False, kind="linear")
+
+        if plot:
+            import matplotlib.pyplot as plt
+            plt.plot(rho, t, label="t")
+            rho_new = np.linspace(0, max(rho) * 1.1, 10001)
+            plt.plot(rho_new, self._t_interp(rho_new), linestyle=":", label="tau interp")
+            plt.legend()
+            plt.xlabel("rho")
+            plt.ylabel("t")
+            plt.show()
+
+    def v_eff(self, density: Density) -> Potential:
+        return Potential(density.x, self._t_interp(density.values))
+
+    def apply(self, density: Density) -> float:
+        return density.inner_product(self.v_eff(density))
+
+    def t_derivative(self, density, eps=1e-6):
+        return (self._t_interp(density + eps) - self._t_interp(density)) / eps
+
+    def functional_derivative(self, density: Density) -> Function:
+        return Function(density.x,
+                        self.v_eff(density).values +
+                        density.values * self.t_derivative(density.values))
+
+
+class KELDA_TAU(DensityFunctional):
+
+    def __init__(self, potential: Potential, particles: float, plot: bool = False):
+        from scipy.interpolate import interp1d
+        self._potential = potential
+        self._particles = particles
+        s = potential.diagonalize_hamiltonian()
+
+        rho = s.density(particles).values
+        tau = s.kinetic_energy_density(particles).values * rho
+        rho, tau = get_single_valued(rho, tau)
+
+        self._tau_interp = interp1d(rho, tau, fill_value="extrapolate", bounds_error=False, kind="linear")
+
+        if plot:
+            import matplotlib.pyplot as plt
+            plt.plot(rho, tau, label="tau")
+            rho_new = np.linspace(0, max(rho) * 1.1, 10001)
+            plt.plot(rho_new, self._tau_interp(rho_new), linestyle=":", label="tau interp")
+            plt.legend()
+            plt.xlabel("rho")
+            plt.ylabel("tau")
+            plt.show()
+
+    def apply(self, density: Density) -> float:
+        tau = Function(density.x, self._tau_interp(density.values))
+        return tau.integrate()
+
+    def functional_derivative(self, density: Density) -> Function:
+        EPS = 1e-6
+        tau = self._tau_interp(density.values)
+        tau_eps = self._tau_interp(density.values + EPS)
+        return Function(density.x, (tau_eps - tau) / EPS)
 
 
 class CombinedDensityFunctional(DensityFunctional):
@@ -293,7 +386,8 @@ def minimize_density_functional_timed(*args, **kwargs):
 def minimize_density_functional(
         particles: float,
         grid: Grid,
-        functional: DensityFunctional) -> Density:
+        functional: DensityFunctional,
+        guess: Density = None) -> Tuple[Density, float]:
     from scipy.optimize import minimize
 
     identity = Tensor.identity(len(grid.values))
@@ -318,7 +412,7 @@ def minimize_density_functional(
         return d_rho_d_x(x).T @ functional.functional_derivative(rho_of_x(x)).values
 
     width = (max(grid.values) - min(grid.values)) / 4.0
-    guess = Tensor.exp(-(grid.values / width) ** 2)
+    guess = guess.values if guess is not None else Tensor.exp(-(grid.values / width) ** 2)
     res = minimize(scipy_cost, guess, jac=scipy_gradient)
 
     return rho_of_x(Tensor.asarray(res.x)), res.fun

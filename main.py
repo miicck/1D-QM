@@ -1,8 +1,8 @@
 def main():
-    from plots import plot_harmonic_ladder_operators
-    plot_harmonic_ladder_operators(profile=True)
-    # from plots import plot_harmonic_oscillator_densities_ladder
-    # plot_harmonic_oscillator_densities_ladder(profile=True)
+    from plots import plot_coulomb_well_tau as f
+    from plots import plot_coulomb_well_kelda as f
+    #from plots import plot_triple_coulomb_well_densities_kelda as f
+    f()
 
 
 if __name__ == "__main__":

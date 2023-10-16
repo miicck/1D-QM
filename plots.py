@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import cpu_count, Pool
 from typing import Dict
 from qm1d.functionals import *
+import numpy as np
 
 
 def plot_harmonic_oscillator_exact_density_t():
@@ -60,12 +61,12 @@ def plot_harmonic_oscillator_exact_t_lda():
 def plot_densities(v: Potential,
                    ke_functionals: Dict[str, Callable[[Dict], DensityFunctional]],
                    use_multiprocessing: bool = True,
-                   show_plot: bool = True):
+                   show_plot: bool = True,
+                   n_side: int = 3):
     s = v.diagonalize_hamiltonian()
-    n_side = 3
     n_values = range(1, n_side * n_side + 1)
 
-    # Get densities using KELDA
+    # Get densities using each KE functional
     results = {}
     for name in ke_functionals:
 
@@ -149,10 +150,141 @@ def plot_triple_coulomb_well_densities_kelda():
     v_double = Potential(grid)
     v_double.values = -10 / (abs(v_triple.x.values - 2) + 1) - 10 / (abs(v_triple.x.values + 2) + 1)
 
+    f = KELDA(v_double, 10, allow_n_mismatch=True)
+    f = KELDA_TAU(v_double, 10, plot=True)
+
     plot_densities(v_triple, {
-        "KELDA N = 10 v = double well": lambda info: KELDA(v_double, 10, allow_n_mismatch=True),
+        "KELDA N = 10 v = double well": lambda info: f,
         "vW": lambda info: VonWeizakerKE()
     })
+
+
+def plot_coulomb_well_tau():
+    grid = Grid(-25, 25, 1001)
+    v = Potential(grid)
+    v.values = -1 / (abs(v.x.values) + 0.5)
+
+    s = v.diagonalize_hamiltonian()
+    N = 3
+    rho = s.density(N)
+
+    vw_E = CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()])
+    tf_E = CombinedDensityFunctional([ExternalPotential(v), ThomasFermiKE()])
+
+    rho_vw, _ = minimize_density_functional(N, grid, vw_E)
+    rho_tf, _ = minimize_density_functional(N, grid, tf_E, guess=rho_vw)
+
+    import matplotlib.pyplot as plt
+
+    def set_x(labels=False):
+        plt.xlim([-15, 15])
+        if labels:
+            plt.xticks(range(-15, 16, 5))
+        else:
+            plt.xticks(range(-15, 16, 5), labels="")
+
+    plt.subplot(311)
+    plt.plot(v.x.values, v.values, label="$v$")
+    plt.plot(v.x.values, s.density(N), label=r"$\rho$")
+    plt.plot(v.x.values, rho_vw.values, label=r"$\rho_{vW}$")
+    plt.plot(v.x.values, rho_tf.values, label=r"$\rho_{TF}$")
+    plt.legend()
+    set_x()
+
+    plt.subplot(312)
+    plt.plot(v.x.values, rho.values ** 0.5, label=r"$\sqrt{\rho}$")
+    for n in range(N):
+        plt.plot(v.x.values, s.orbitals[n].values, label=fr"$\phi_{n}$")
+    plt.legend()
+    plt.ylabel(r"$\phi$")
+    set_x()
+
+    plt.subplot(313)
+    tau = s.kinetic_energy_density(N).values * rho.values
+    tau_tf = rho.tf_kinetic_energy_density * rho.values
+    tau_vw = rho.vw_kinetic_energy_density * rho.values
+    tau_vw_lap = rho.vw_lap_kinetic_energy_density * rho.values
+
+    plt.plot(v.x.values, tau, label=r"$\tau_{exact}$")
+    plt.plot(v.x.values, tau_tf, label=r"$\tau_{TF}$")
+    plt.plot(v.x.values, tau_vw, label=r"$\tau_{vW}$")
+    plt.plot(v.x.values, tau_vw_lap, label=r"$\tau_{LvW}$")
+    plt.ylabel(r"$\tau$")
+    plt.xlabel("$x$")
+    plt.legend()
+    set_x(labels=True)
+
+    ax = plt.gca().inset_axes([0.1, 0.4, 0.3, 0.5])
+    ax.plot(v.x.values, tau)
+    ax.plot(v.x.values, tau_tf)
+    ax.plot(v.x.values, tau_vw)
+    ax.plot(v.x.values, tau_vw_lap)
+    ax.set_xlim([-3, 3])
+    ax.set_ylim([-0.01, 0.1])
+
+    plt.show()
+
+
+def plot_coulomb_well_lda():
+    grid = Grid(-25, 25, 1001)
+    v = Potential(grid)
+    v.values = -1 / (abs(v.x.values) + 0.5)
+
+    s = v.diagonalize_hamiltonian()
+    N = 3
+    rho = s.density(N)
+    
+    tau = s.kinetic_energy_density(N).values * rho.values
+    tau_tf = rho.tf_kinetic_energy_density * rho.values
+    tau_vw = rho.vw_kinetic_energy_density * rho.values
+    tau_vw_lap = rho.vw_lap_kinetic_energy_density * rho.values
+
+    plt.plot(rho.values, tau, label=r"$\tau_{exact}$")
+    plt.plot(rho.values, tau_tf, label=r"$\tau_{TF}$")
+    plt.plot(rho.values, tau_vw, label=r"$\tau_{vW}$")
+    plt.plot(rho.values, tau_vw_lap, label=r"$\tau_{LvW}$")
+    plt.xlabel(r"$\rho(x)$")
+    plt.ylabel(r"$\tau(x)$")
+    plt.legend(loc=2, bbox_to_anchor=[0.55,0.95])
+
+    ax = plt.gca().inset_axes([0.1, 0.4, 0.4, 0.5])
+    ax.plot(rho.values, tau)
+    ax.plot(rho.values, tau_tf)
+    ax.plot(rho.values, tau_vw)
+    ax.plot(rho.values, tau_vw_lap)
+    ax.set_xlim([0, 0.236])
+    ax.set_ylim([-0.0018, 0.0225])
+    
+    plt.show()
+
+
+def plot_coulomb_well_kelda():
+    grid = Grid(-25, 25, 1001)
+    v = Potential(grid)
+    v.values = -1 / (abs(v.x.values) + 0.5)
+
+    s = v.diagonalize_hamiltonian()
+    N = 3
+    rho = s.density(N)
+
+    kelda_e = CombinedDensityFunctional([ExternalPotential(v), KELDA(v, N, plot=True)])
+    kelda_e3 = CombinedDensityFunctional([ExternalPotential(v), KELDA_NEW(v, N, plot=True)])
+    kelda_e2 = CombinedDensityFunctional([ExternalPotential(v), KELDA_TAU(v, N, plot=True)])
+    
+    t, kelda_rho, _ = minimize_density_functional_timed(N, grid, kelda_e)
+    t2, kelda_rho_2, _ = minimize_density_functional_timed(N, grid, kelda_e2)
+    t3, kelda_rho_3, _ = minimize_density_functional_timed(N, grid, kelda_e3)
+
+    print(t, t2, t3)
+
+    plt.plot(v.x.values, v.values, label="$v$")
+    plt.plot(v.x.values, rho.values, label=r"$\rho$")
+    plt.plot(v.x.values, kelda_rho, label=r"$\rho_{KELDA}$")
+    plt.plot(v.x.values, kelda_rho_3, label=r"$\rho_{KELDA-NEW}$")
+    plt.plot(v.x.values, kelda_rho_2, label=r"$\rho_{KELDA-TAU}$")
+    plt.legend()
+
+    plt.show()
 
 
 def plot_kelda_interpolations():
@@ -265,4 +397,4 @@ def plot_harmonic_ladder_operators(profile=False):
 
 
 if __name__ == "__main__":
-    plot_harmonic_ladder_operators()
+    plot_harmonic_oscillator_densities_ladder()
