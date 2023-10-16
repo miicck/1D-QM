@@ -194,6 +194,32 @@ def get_single_valued(x: Tensor, y: Tensor) -> Tensor:
     return Tensor.from_values(sv).T
 
 
+def get_single_valued_averaged(x: Tensor, y: Tensor) -> Tensor:
+    isort = Tensor.argsort(x)
+    xs = x[isort]
+    ys = y[isort]
+
+    sv = []
+    i = 0
+    while True:
+
+        # Get range i:j for which xs don't vary
+        for j in range(i + 1, len(xs)):
+            if xs[j] > xs[i]:
+                break
+
+        sv.append([xs[i], Tensor.mean(ys[i:j])])
+        i = j
+
+        if i == len(xs) - 1:
+            break
+
+    return Tensor.from_values(sv).T
+
+
+get_single_valued = get_single_valued
+
+
 class KELDA(DensityFunctional):
 
     def __init__(self, potential: Potential, particles: float, allow_n_mismatch: bool = False, plot: bool = False):
@@ -294,6 +320,7 @@ class KELDA_NEW(DensityFunctional):
         t = s.kinetic_energy_density(particles).values
 
         i_keep = rho > 1e-5
+        
         rho = rho[i_keep]
         t = t[i_keep]
 

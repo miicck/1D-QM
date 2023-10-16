@@ -62,7 +62,9 @@ def plot_densities(v: Potential,
                    ke_functionals: Dict[str, Callable[[Dict], DensityFunctional]],
                    use_multiprocessing: bool = True,
                    show_plot: bool = True,
-                   n_side: int = 3):
+                   n_side: int = 3,
+                   x_range: Tuple[float] = None,
+                   rho_range: Tuple[float] = None):
     s = v.diagonalize_hamiltonian()
     n_values = range(1, n_side * n_side + 1)
 
@@ -76,7 +78,7 @@ def plot_densities(v: Potential,
                 ke_functionals[name]({"N": n})
             ])
 
-        args = [[n, v.x, energy_functional(n)] for n in n_values]
+        args = [[n, v.x, energy_functional(n), s.density(n)] for n in n_values]
 
         if use_multiprocessing:
             with Pool(cpu_count()) as p:
@@ -92,15 +94,43 @@ def plot_densities(v: Potential,
     for n in n_values:
         plt.subplot(n_side, n_side, n)
 
+        text = rf" $N = {n}$"
         for name in results:
             # Plot density
             t, d, e = results[name][n - 1]
-            plt.plot(d.x.values, d.values, label=f"{name} (e = {e:.5f})")
+            plt.plot(d.x.values, d.values, label=f"{name}")
+            text += f"\n E({name}) = {e:.5f}"
+            if x_range is not None:
+                plt.xlim(x_range)
+            if rho_range is not None:
+                plt.ylim(rho_range)
 
-        plt.annotate(rf"$N = {n}$", (min(d.x.values), max(d.values) / 10.0))
-        plt.xlabel(r"$x$")
-        plt.ylabel(r"$\rho(x)$")
-        plt.legend(loc="upper right")
+        plt.annotate(text, (x_range[0], rho_range[1]-0.1), verticalalignment="top")
+
+        if rho_range is None:
+            plt.ylabel(r"$\rho(x)$")
+        else:
+            if n % n_side == 1:
+                plt.ylabel(r"$\rho(x)$")
+            else:
+                plt.yticks([])
+
+        if x_range is None:
+            plt.xlabel(r"$x$")
+        else:
+            if n >= n_side**2 - n_side:
+                plt.xlabel("$x$")
+                plt.xticks(range(round(x_range[0])+1, round(x_range[1]), 2))
+            else:
+                plt.xticks([])
+        
+        if n == n_side*n_side:
+            plt.legend(loc="lower center")
+
+    if rho_range is not None:
+        plt.subplots_adjust(wspace=0)
+    if x_range is not None:
+        plt.subplots_adjust(hspace=0)
 
     plt.figure()
     for name in results:
@@ -141,7 +171,7 @@ def plot_harmonic_oscillator_densities_ladder(profile=False):
 
 
 def plot_triple_coulomb_well_densities_kelda():
-    grid = Grid(-10, 10, 151)
+    grid = Grid(-10, 10, 501)
 
     v_triple = Potential(grid)
     v_triple.values = -10 / (abs(v_triple.x.values - 3) + 1) - 10 / (abs(v_triple.x.values + 3) + 1) - 10 / (
@@ -150,22 +180,20 @@ def plot_triple_coulomb_well_densities_kelda():
     v_double = Potential(grid)
     v_double.values = -10 / (abs(v_triple.x.values - 2) + 1) - 10 / (abs(v_triple.x.values + 2) + 1)
 
-    f = KELDA(v_double, 10, allow_n_mismatch=True)
-    f = KELDA_TAU(v_double, 10, plot=True)
-
     plot_densities(v_triple, {
-        "KELDA N = 10 v = double well": lambda info: f,
-        "vW": lambda info: VonWeizakerKE()
-    })
+        "T_vN": lambda info: KELDA_NEW(v_double, 10),
+        # "TF": lambda info: ThomasFermiKE(),
+        # "vW": lambda info: VonWeizakerKE(),
+    }, x_range=[-5, 5], rho_range=[-0.1, 2.5])
 
 
-def plot_coulomb_well_tau():
-    grid = Grid(-25, 25, 1001)
+def plot_coulomb_well_orbitals_and_densities():
+    grid = Grid(-10, 10, 1001)
     v = Potential(grid)
-    v.values = -1 / (abs(v.x.values) + 0.5)
+    v.values = -10 / (abs(v.x.values) + 1)
 
     s = v.diagonalize_hamiltonian()
-    N = 3
+    N = 4
     rho = s.density(N)
 
     vw_E = CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()])
@@ -177,17 +205,15 @@ def plot_coulomb_well_tau():
     import matplotlib.pyplot as plt
 
     def set_x(labels=False):
-        plt.xlim([-15, 15])
-        if labels:
-            plt.xticks(range(-15, 16, 5))
-        else:
-            plt.xticks(range(-15, 16, 5), labels="")
+        plt.xlim([-5, 5])
+        if not labels:
+            plt.xticks([])
 
     plt.subplot(311)
-    plt.plot(v.x.values, v.values, label="$v$")
-    plt.plot(v.x.values, s.density(N), label=r"$\rho$")
+    plt.plot(v.x.values, s.density(N), label=r"$\rho_{exact}$")
     plt.plot(v.x.values, rho_vw.values, label=r"$\rho_{vW}$")
     plt.plot(v.x.values, rho_tf.values, label=r"$\rho_{TF}$")
+    plt.ylabel(r"$\rho$")
     plt.legend()
     set_x()
 
@@ -214,26 +240,27 @@ def plot_coulomb_well_tau():
     plt.legend()
     set_x(labels=True)
 
-    ax = plt.gca().inset_axes([0.1, 0.4, 0.3, 0.5])
+    ax = plt.gca().inset_axes([0.02, 0.4, 0.4, 0.55])
     ax.plot(v.x.values, tau)
     ax.plot(v.x.values, tau_tf)
     ax.plot(v.x.values, tau_vw)
     ax.plot(v.x.values, tau_vw_lap)
-    ax.set_xlim([-3, 3])
-    ax.set_ylim([-0.01, 0.1])
+    ax.set_yticks([])
+    ax.set_xlim([-5, -1.473])
+    ax.set_ylim([-0.06, 0.251])
 
     plt.show()
 
 
 def plot_coulomb_well_lda():
-    grid = Grid(-25, 25, 1001)
+    grid = Grid(-10, 10, 2001)
     v = Potential(grid)
-    v.values = -1 / (abs(v.x.values) + 0.5)
+    v.values = -10 / (abs(v.x.values) + 1)
 
     s = v.diagonalize_hamiltonian()
-    N = 3
+    N = 4
     rho = s.density(N)
-    
+
     tau = s.kinetic_energy_density(N).values * rho.values
     tau_tf = rho.tf_kinetic_energy_density * rho.values
     tau_vw = rho.vw_kinetic_energy_density * rho.values
@@ -245,44 +272,44 @@ def plot_coulomb_well_lda():
     plt.plot(rho.values, tau_vw_lap, label=r"$\tau_{LvW}$")
     plt.xlabel(r"$\rho(x)$")
     plt.ylabel(r"$\tau(x)$")
-    plt.legend(loc=2, bbox_to_anchor=[0.55,0.95])
+    plt.legend(loc=2, bbox_to_anchor=[0.55, 0.95])
 
     ax = plt.gca().inset_axes([0.1, 0.4, 0.4, 0.5])
     ax.plot(rho.values, tau)
     ax.plot(rho.values, tau_tf)
     ax.plot(rho.values, tau_vw)
     ax.plot(rho.values, tau_vw_lap)
-    ax.set_xlim([0, 0.236])
-    ax.set_ylim([-0.0018, 0.0225])
-    
+    ax.set_xlim([0, 0.5])
+    ax.set_ylim([-0.055, 0.19])
+
     plt.show()
 
 
 def plot_coulomb_well_kelda():
-    grid = Grid(-25, 25, 1001)
+    grid = Grid(-10, 10, 1001)
     v = Potential(grid)
-    v.values = -1 / (abs(v.x.values) + 0.5)
+    v.values = -10 / (abs(v.x.values) + 1)
 
     s = v.diagonalize_hamiltonian()
-    N = 3
+    N = 4
     rho = s.density(N)
+    E = v.inner_product(rho) + s.kinetic_energy(N)
 
-    kelda_e = CombinedDensityFunctional([ExternalPotential(v), KELDA(v, N, plot=True)])
-    kelda_e3 = CombinedDensityFunctional([ExternalPotential(v), KELDA_NEW(v, N, plot=True)])
-    kelda_e2 = CombinedDensityFunctional([ExternalPotential(v), KELDA_TAU(v, N, plot=True)])
-    
-    t, kelda_rho, _ = minimize_density_functional_timed(N, grid, kelda_e)
-    t2, kelda_rho_2, _ = minimize_density_functional_timed(N, grid, kelda_e2)
-    t3, kelda_rho_3, _ = minimize_density_functional_timed(N, grid, kelda_e3)
+    kelda_rho, kelda_E = minimize_density_functional(
+        N, grid, CombinedDensityFunctional([ExternalPotential(v), KELDA_NEW(v, N)]))
+    tf_rho, tf_E = minimize_density_functional(
+        N, grid, CombinedDensityFunctional([ExternalPotential(v), ThomasFermiKE()]))
+    vw_rho, ve_E = minimize_density_functional(
+        N, grid, CombinedDensityFunctional([ExternalPotential(v), VonWeizakerKE()]))
 
-    print(t, t2, t3)
-
-    plt.plot(v.x.values, v.values, label="$v$")
-    plt.plot(v.x.values, rho.values, label=r"$\rho$")
-    plt.plot(v.x.values, kelda_rho, label=r"$\rho_{KELDA}$")
-    plt.plot(v.x.values, kelda_rho_3, label=r"$\rho_{KELDA-NEW}$")
-    plt.plot(v.x.values, kelda_rho_2, label=r"$\rho_{KELDA-TAU}$")
+    plt.plot(v.x.values, rho.values, label=rf"$\rho$  $E = {E:.5f}$")
+    plt.plot(v.x.values, tf_rho, label=rf"$\rho_{{TF}}$  $E = {tf_E:.5f}$")
+    plt.plot(v.x.values, vw_rho, label=rf"$\rho_{{vW}}$  $E = {ve_E:.5f}$")
+    plt.plot(v.x.values, kelda_rho, label=rf"$\rho_{{REF}}$  $E = {kelda_E:.5f}$")
     plt.legend()
+    plt.xlim([-5, 5])
+    plt.xlabel("$x$")
+    plt.ylabel(r"$\rho$")
 
     plt.show()
 
@@ -301,26 +328,33 @@ def plot_kelda_interpolations():
 
     n_values = range(1, 9 + 1)
 
+    tau_range = [-1, 7]
+    rho_range = [0, 1.6]
+
+    plt.suptitle(fr"$\rho \in [{rho_range[0]}, {rho_range[1]}]\;\; \tau \in [{tau_range[0]}, {tau_range[1]}]$")
+
     for i, n in enumerate(n_values):
         for j, v_name in enumerate(potentials):
             plt.subplot(len(n_values) + 2, len(potentials), 1 + j + i * len(potentials))
 
             f = KELDA(potentials[v_name], n)
-            interp_densities = Tensor.linspace(0, max(f.reference_densities) * 1.1, 1000)
-            plt.plot(f.reference_densities, f.reference_kinetic_energy_densities, color="blue")
-            plt.plot(interp_densities, f.t_lda(interp_densities), linestyle="dashed", color="red")
+            interp_densities = Tensor.linspace(0, max(f.reference_densities) * 2, 1000)
+            plt.plot(f.reference_densities, f.reference_kinetic_energy_densities * f.reference_densities, color="blue")
+            plt.plot(interp_densities, f.t_lda(interp_densities) * interp_densities, linestyle="dashed", color="red")
 
-            plt.ylim([-5, 5])
+            plt.xlim(rho_range)
+            plt.ylim(tau_range)
+
             plt.xticks([])
             plt.yticks([])
 
             if i == len(n_values) - 1:
                 plt.xlabel(fr"$\rho$")
-                plt.xticks([0, 0.5, 1, 1.5])
+                plt.xticks([])
 
             if j == 0:
-                plt.ylabel(fr"$t(\rho)$" + f"\nN = {n}")
-                plt.yticks([-2.0, 2.0])
+                plt.ylabel(fr"$\tau(\rho)$" + f"\nN = {n}")
+                plt.yticks([])
 
     for j, v_name in enumerate(potentials):
 
