@@ -115,7 +115,7 @@ class Density(Function):
 
     @property
     def tf_kinetic_energy_density(self) -> Tensor:
-        c1 = (np.pi ** 2) / 24
+        c1 = (np.pi ** 2) / 6
         return c1 * (self.values ** 2)
 
     @property

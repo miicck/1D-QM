@@ -55,11 +55,27 @@ class VonWeizakerKE(DensityFunctional):
         return Function(density.x, -0.5 * p2.values / p.values)
 
 
+class PowerFunctional(DensityFunctional):
+    # A functional of the form
+    # F(\rho) = c\int \rho^p(r) dr
+
+    def __init__(self, coefficient: float, power: float):
+        self._c = coefficient
+        self._p = power
+
+    def apply(self, density: Density) -> float:
+        t = Function(density.x, density.values ** (self._p - 1))
+        return self._c * density.inner_product(t)
+
+    def functional_derivative(self, density: Density) -> Function:
+        return Function(density.x, self._p * self._c * density.values ** (self._p - 1))
+
+
 class ThomasFermiKE(DensityFunctional):
 
     @staticmethod
     def prefactor() -> float:
-        return (math.pi ** 2) / 24
+        return (math.pi ** 2) / 6
 
     def apply(self, density: Density) -> float:
         t = Function(density.x, density.values ** 2)
@@ -320,7 +336,7 @@ class KELDA_NEW(DensityFunctional):
         t = s.kinetic_energy_density(particles).values
 
         i_keep = rho > 1e-5
-        
+
         rho = rho[i_keep]
         t = t[i_keep]
 
